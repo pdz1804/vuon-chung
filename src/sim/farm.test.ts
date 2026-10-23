@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HOUR, dryForMs, hydratedMs, isWilted, qualityStars, stage } from './growth';
-import { buySeeds, harvest, newFarm, payout, plant, plotState, ship, till, vnDay, water } from './farm';
+import { buySeeds, harvest, newFarm, payout, plant, plotState, ship, till, useTile, vnDay, water } from './farm';
 
 const T0 = Date.UTC(2026, 9, 23, 1, 0); // 08:00 in Vietnam
 
@@ -96,5 +96,17 @@ describe('farm actions', () => {
     expect(buySeeds(s, 'sunflower').msg).toBe('not_enough_coins');
     expect(buySeeds(s, 'rau_muong', 2).ok).toBe(true);
     expect(s.coins).toBe(0);
+  });
+});
+
+describe('useTile', () => {
+  it('walks a tile through till, plant, water, growing, harvest', () => {
+    const s = newFarm();
+    expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('tilled');
+    expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('planted');
+    expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('watered');
+    const g = useTile(s, 2, 2, 'rau_muong', T0 + 2 * HOUR);
+    expect(g).toMatchObject({ ok: false, msg: 'growing', vars: { pct: 50 } });
+    expect(useTile(s, 2, 2, 'rau_muong', T0 + 4 * HOUR).msg).toBe('harvested');
   });
 });

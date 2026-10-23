@@ -17,6 +17,7 @@
         <span id="xp" class="pill"></span>
         <span id="clock" class="pill"></span>
         <span id="binval" class="pill muted-pill"></span>
+        <button id="invite" class="pill btn invite" type="button" hidden></button>
         <button id="lang" class="pill btn" type="button" aria-label="Language"></button>
       </header>
       <div id="toast" role="status" aria-live="polite"></div>
@@ -27,6 +28,45 @@
       </footer>
       <div id="stick" aria-hidden="true"><div id="knob"></div></div>
       <button id="act" type="button"></button>
+      <div id="lobby" class="modal lobby" hidden>
+        <div class="sheet">
+          <h1 class="brand">Vườn Chung</h1>
+          <p class="tagline" data-t="tagline"></p>
+          <section data-panel="signin">
+            <button id="google" class="big" type="button" data-t="sign_in"></button>
+            <form id="test-login" hidden>
+              <input id="test-name" placeholder="test name" autocomplete="off" />
+              <button type="submit">Test login</button>
+            </form>
+          </section>
+          <section data-panel="loading"><p data-t="loading"></p></section>
+          <section data-panel="retry"><button id="retry" class="big" type="button" data-t="retry"></button></section>
+          <section data-panel="create">
+            <h2 data-t="new_garden"></h2>
+            <p data-t="pick_look"></p>
+            <div id="looks">
+              <button type="button" class="on" data-look="phu"><canvas width="16" height="16"></canvas></button>
+              <button type="button" data-look="su"><canvas width="16" height="16"></canvas></button>
+            </div>
+            <button id="create" class="big" type="button" data-t="create"></button>
+            <p class="or" data-t="or_join"></p>
+            <form id="join">
+              <input id="join-code" autocomplete="off" />
+              <button type="submit" data-t="join"></button>
+            </form>
+          </section>
+          <section data-panel="invite">
+            <h2 data-t="invite_title"></h2>
+            <p data-t="invite_hint"></p>
+            <div class="copyrow">
+              <input id="invite-link" readonly />
+              <button id="copy" type="button" data-t="copy"></button>
+            </div>
+            <button id="enter" class="big" type="button" data-t="enter"></button>
+          </section>
+          <p id="lobby-error" role="alert"></p>
+        </div>
+      </div>
       <div id="shop" class="modal" hidden>
         <div class="sheet">
           <h2 id="shop-title"></h2>

@@ -247,3 +247,10 @@ function drawCrop(c: Ctx, id: string, st: number, leaf: string, fruit: string) {
     fill(c, '#9ccc65', 6, 1, 4, 4);
   }
 }
+
+/** Draws an avatar onto a plain canvas (used by the lobby before Phaser starts). */
+export function drawAvatar(cv: HTMLCanvasElement, look: keyof typeof AVATARS) {
+  const c = cv.getContext('2d')!;
+  c.clearRect(0, 0, cv.width, cv.height);
+  art(c, PLAYER_DOWN, AVATARS[look]);
+}

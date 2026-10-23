@@ -18,7 +18,19 @@ export class Hud {
   stick = { x: 0, y: 0 };
   private toastTimer = 0;
 
-  constructor(private h: HudHandlers) {
+  private h: HudHandlers = {
+    onSelectSeed: () => {},
+    onAction: () => {},
+    onBuy: () => {},
+    onLangChange: () => {},
+  };
+
+  /** Connects the HUD to the running scene. */
+  bind(h: HudHandlers) {
+    this.h = h;
+  }
+
+  constructor() {
     $('#lang').addEventListener('click', () => {
       setLang(getLang() === 'vi' ? 'en' : 'vi');
       this.h.onLangChange();
@@ -33,6 +45,11 @@ export class Hud {
 
   get shopOpen() {
     return !$('#shop').hidden;
+  }
+
+  /** True while any dialog covers the game, so the farmer stands still. */
+  get modalOpen() {
+    return !!document.querySelector('.modal:not([hidden])');
   }
 
   setClock(clock: string) {

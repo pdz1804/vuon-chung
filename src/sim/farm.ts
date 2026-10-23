@@ -1,6 +1,6 @@
 // Farm state and the actions players take on it. Pure: every action receives `now`,
 // so the same code can later run against the shared Firestore world.
-import { WATER_MS, isHydrated, qualityStars, stage, type CropTimes } from './growth';
+import { WATER_MS, isHydrated, progress, qualityStars, stage, type CropTimes } from './growth';
 import { SPECIES, sellPrice, type SpeciesId } from './species';
 
 export const SCHEMA_VERSION = 1;
@@ -161,4 +161,24 @@ export function migrate(raw: unknown): FarmState {
   const s = raw as Partial<FarmState> | null;
   if (!s || typeof s !== 'object' || s.schemaVersion !== SCHEMA_VERSION) return newFarm();
   return { ...newFarm(), ...s };
+}
+
+/**
+ * The single "use" action on a field tile, decided on the state it runs against.
+ * Running the decision inside the transaction means two players acting at once
+ * can't both harvest the same plant or till the same tile twice.
+ */
+export function useTile(s: FarmState, x: number, y: number, selected: SpeciesId, now: number): ActionResult {
+  const plot = s.plots[key(x, y)];
+  if (!plot) return till(s, x, y);
+  const state = plotState(plot, now);
+  if (state === 'empty') return plant(s, x, y, selected, now);
+  if (state === 'needs_water') return water(s, x, y, now);
+  if (state === 'ready') return harvest(s, x, y, now);
+  const crop = plot.crop!;
+  return {
+    ok: false,
+    msg: 'growing',
+    vars: { species: crop.species, pct: Math.floor(progress(crop, growMsFor(crop), now) * 100) },
+  };
 }

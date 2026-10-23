@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// Each world belongs to at most two players. The 128-bit invite code is the
+// only way in, and it is consumed by the join.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+    function worldPath(w) {
+      return /databases/$(database)/documents/worlds/$(w);
+    }
+
+    match /users/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    match /worlds/{w} {
+      allow read: if signedIn() && uid() in resource.data.members;
+
+      allow create: if signedIn()
+        && request.resource.data.members == [uid()]
+        && request.resource.data.profiles.keys().hasOnly([uid()]);
+
+      // Members may change the farm but never the membership; the farm stays a map
+      // so one bad write can't brick the partner's game.
+      allow update: if signedIn() && uid() in resource.data.members
+        && request.resource.data.farm is map
+        && request.resource.data.members == resource.data.members
+        && request.resource.data.profiles.keys().hasOnly(resource.data.members);
+
+      // Joining: append yourself with a live invite for this world.
+      allow update: if signedIn()
+        && resource.data.members.size() == 1
+        && !(uid() in resource.data.members)
+        && request.resource.data.members == resource.data.members.concat([uid()])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'profiles', 'joinCode'])
+        && request.resource.data.profiles.diff(resource.data.profiles).affectedKeys().hasOnly([uid()])
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.joinCode)).data.worldId == w
+        && get(/databases/$(database)/documents/invites/$(request.resource.data.joinCode)).data.expiresAt > request.time;
+
+      allow delete: if false;
+    }
+
+    match /invites/{code} {
+      // Knowing the code is the capability; listing is never allowed.
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && request.resource.data.createdBy == uid()
+        && uid() in get(worldPath(request.resource.data.worldId)).data.members;
+      allow delete: if signedIn() && uid() in getAfter(worldPath(resource.data.worldId)).data.members;
+    }
+  }
+}

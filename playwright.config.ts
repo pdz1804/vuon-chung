@@ -12,7 +12,20 @@ export default defineConfig({
   },
   webServer: { command: 'npm run dev', url: 'http://localhost:5240', reuseExistingServer: true },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'], ...(process.env.CI ? {} : { channel: 'chrome' }) } },
-    { name: 'phone', use: { ...devices['Pixel 7'], ...(process.env.CI ? {} : { channel: 'chrome' }) } },
+    {
+      name: 'desktop',
+      testMatch: /solo-.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], ...(process.env.CI ? {} : { channel: 'chrome' }) },
+    },
+    {
+      name: 'shared',
+      testMatch: /shared-.*.spec.ts/,
+      use: { ...devices['Desktop Chrome'], ...(process.env.CI ? {} : { channel: 'chrome' }) },
+    },
+    {
+      name: 'phone',
+      testMatch: /solo-.*\.spec\.ts/,
+      use: { ...devices['Pixel 7'], ...(process.env.CI ? {} : { channel: 'chrome' }) },
+    },
   ],
 });

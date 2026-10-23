@@ -16,8 +16,14 @@ if (DEV) {
   }
 }
 
+/** Server minus local clock (ms), set once signed in to a shared world. */
+let offset = 0;
+export function setClockOffset(ms: number) {
+  offset = DEV ? 0 : ms;
+}
+
 export function now(): number {
-  return base + (Date.now() - realStart) * SPEED;
+  return base + (Date.now() - realStart) * SPEED + offset;
 }
 
 export function persistClock() {
