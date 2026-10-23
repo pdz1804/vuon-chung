@@ -221,6 +221,66 @@ export function buildTextures(scene: Phaser.Scene) {
       size,
     );
   }
+  for (const frame of [0, 1]) {
+    make(scene, `chicken_${frame}`, (c) =>
+      art(
+        c,
+        [
+          '................',
+          '................',
+          '.......RR.......',
+          '......WWWW......',
+          '......WEWWY.....',
+          '......WWWWYY....',
+          '..W...WWWW......',
+          '..WWWWWWWWW.....',
+          '..WWWWWWWWWW....',
+          '...WWWWWWWWW....',
+          '....WWWWWWW.....',
+          '.....WWWWW......',
+          frame ? '.....Y...Y......' : '......Y.Y.......',
+          frame ? '....YY..YY......' : '.....YY.YY......',
+          '................',
+          '................',
+        ],
+        { W: '#fdfaf0', E: '#222', R: '#e0433a', Y: '#f2a33a' },
+      ),
+    );
+  }
+  make(scene, 'egg_4', (c) =>
+    art(
+      c,
+      ['....', '.EE.', 'EEEE', 'EEEE', 'EEEE', '.EE.'].map((r) => r),
+      { E: '#f6ead2' },
+      6,
+      5,
+    ),
+  );
+  make(
+    scene,
+    'coop',
+    (c) => {
+      fill(c, '#a24a32', 0, 6, 32, 10);
+      for (let x = 0; x < 32; x += 4) fill(c, '#86382a', x, 6 + ((x / 4) % 2), 2, 10);
+      fill(c, '#e8cf9a', 3, 16, 26, 14);
+      fill(c, '#7a5232', 3, 29, 26, 2);
+      fill(c, '#4a3020', 12, 20, 8, 10);
+      fill(c, '#e8cf9a', 15, 26, 2, 4);
+      fill(c, '#fdfaf0', 5, 19, 4, 4);
+    },
+    32,
+    32,
+  );
+  make(scene, 'feeder', (c) => {
+    fill(c, '#7a5232', 2, 10, 12, 4);
+    fill(c, '#9a6b43', 3, 11, 10, 2);
+  });
+  make(scene, 'feeder_full', (c) => {
+    fill(c, '#7a5232', 2, 10, 12, 4);
+    fill(c, '#e2b04a', 3, 8, 10, 4);
+    fill(c, '#f4d06f', 5, 8, 2, 1);
+    fill(c, '#f4d06f', 9, 9, 2, 1);
+  });
   make(scene, 'raindrop', (c) => fill(c, '#cfe8ff', 0, 0, 1, 3), 1, 3);
   make(scene, 'sapling', (c) =>
     art(

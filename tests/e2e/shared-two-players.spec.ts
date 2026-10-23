@@ -85,6 +85,14 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await expect(b.locator('#tree-list')).toContainText('Lần đầu gặp nhau');
   await a.waitForFunction(() => (window.__qa.farm() as unknown as { memories: unknown[] }).memories.length === 1);
 
+  // An emote from Alice pops up over her avatar on Bob's screen.
+  await expect(a.locator('#emotes')).toBeVisible();
+  await a.locator('#emotes button[data-e="❤️"]').click();
+  await b.waitForFunction(() => {
+    const s = window.__qa.scene as unknown as { children: { list: { text?: string }[] } };
+    return s.children.list.some((c) => c.text === '❤️');
+  });
+
   // An invite can't be reused by a third person.
   const c = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
   await c.goto(`/?join=${url.searchParams.get('join')}&emu=1`);

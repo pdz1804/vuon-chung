@@ -1,6 +1,7 @@
 // Farm state and the actions players take on it. Pure: every action receives `now`,
 // so the same code can later run against the shared Firestore world.
 import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type CropTimes } from './growth';
+import type { Animal } from './animals';
 import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
 import { SPECIES, sellPrice, type SpeciesId } from './species';
@@ -39,6 +40,11 @@ export interface FarmState {
   letters: Letter[];
   memories: Memory[];
   feed: FeedEvent[];
+  animals: Animal[];
+  /** Vietnam day the shared feeder was last filled. */
+  feederDay: string;
+  /** Today's duo order progress. */
+  duo?: { day: string; by: string[]; xp: number };
 }
 
 export type ActionResult =
@@ -59,6 +65,8 @@ export function newFarm(): FarmState {
     letters: [],
     memories: [],
     feed: [],
+    animals: [],
+    feederDay: '',
   };
 }
 
@@ -166,7 +174,7 @@ export function ship(s: FarmState, now: number): ActionResult {
 export function binValue(bin: Record<string, number>): number {
   return Object.entries(bin).reduce((sum, [item, c]) => {
     const [id, stars] = item.split(':');
-    return sum + sellPrice(id as SpeciesId, Number(stars)) * c;
+    return sum + sellPrice(id, Number(stars)) * c;
   }, 0);
 }
 

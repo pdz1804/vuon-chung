@@ -63,6 +63,10 @@ export const SPECIES: Record<SpeciesId, Species> = {
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[];
 
-export function sellPrice(id: SpeciesId, stars: number): number {
-  return Math.round(SPECIES[id].sellPrice * (1 + 0.25 * (stars - 1)));
+/** Sellable things that aren't crops (animal products). */
+export const PRODUCTS: Record<string, number> = { egg: 30 };
+
+export function sellPrice(id: string, stars: number): number {
+  const base = (SPECIES as Record<string, Species | undefined>)[id]?.sellPrice ?? PRODUCTS[id] ?? 0;
+  return Math.round(base * (1 + 0.25 * (stars - 1)));
 }

@@ -5,7 +5,7 @@ export const MAP_H = 22;
 export type Ground = 'grass' | 'path' | 'water' | 'fence' | 'tree' | 'field';
 
 export interface Prop {
-  id: 'house' | 'bin' | 'stall' | 'sapling' | 'board' | 'mailbox';
+  id: 'house' | 'bin' | 'stall' | 'sapling' | 'board' | 'mailbox' | 'coop' | 'feeder';
   x: number;
   y: number;
   w: number;
@@ -19,6 +19,8 @@ export const PROPS: Prop[] = [
   { id: 'sapling', x: 15, y: 3, w: 1, h: 1 },
   { id: 'board', x: 21, y: 4, w: 1, h: 1 },
   { id: 'mailbox', x: 7, y: 4, w: 1, h: 1 },
+  { id: 'coop', x: 2, y: 8, w: 2, h: 2 },
+  { id: 'feeder', x: 5, y: 9, w: 1, h: 1 },
 ];
 
 export const FIELD = { x0: 9, y0: 9, x1: 22, y1: 16 };
@@ -61,3 +63,5 @@ export function propAt(x: number, y: number): Prop | undefined {
 
 export const BLOCKING: Ground[] = ['water', 'fence', 'tree'];
 export const SPAWN = { x: 15, y: 7 };
+/** Where chickens wander, in pixels (left of the field fence). */
+export const PEN = { x0: 2 * 16 + 6, y0: 10.5 * 16, x1: 6.6 * 16, y1: 15 * 16 };

@@ -592,3 +592,31 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* Emotes */
+#emotes {
+  position: absolute;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  top: calc(52px + env(safe-area-inset-top, 0px));
+  display: grid;
+  gap: 6px;
+  pointer-events: auto;
+}
+#emotes[hidden] {
+  display: none;
+}
+#emotes button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--wood);
+  background: var(--paper);
+  font-size: 20px;
+  cursor: pointer;
+  box-shadow: 0 2px 0 var(--wood);
+}
+.shop-row.duo {
+  background: #fff4f7;
+  border-radius: 10px;
+  padding: 4px;
+}

@@ -1,8 +1,10 @@
 // DOM overlay: status bar, seed hotbar, bag, toasts, shop, and touch controls.
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
-import { binValue, speciesUnlocked, type FarmState } from '../sim/farm';
-import { boardFor, doneToday, haveCount } from '../sim/orders';
+import { binValue, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
+import { ANIMALS } from '../sim/animals';
+import { boardFor, doneToday, duoDelivered, duoFor, haveCount } from '../sim/orders';
+import { isUnlocked } from '../sim/progression';
 import { UNLOCKS, levelFor, levelProgress } from '../sim/progression';
 import { SPECIES, SPECIES_IDS, type SpeciesId } from '../sim/species';
 
@@ -11,6 +13,9 @@ export interface HudHandlers {
   onAction(): void;
   onBuy(id: SpeciesId, n: number): void;
   onDeliver(idx: number): void;
+  onDeliverDuo(): void;
+  onBuyAnimal(): void;
+  onEmote(e: string): void;
   onLangChange(): void;
 }
 
@@ -26,6 +31,9 @@ export class Hud {
     onAction: () => {},
     onBuy: () => {},
     onDeliver: () => {},
+    onDeliverDuo: () => {},
+    onBuyAnimal: () => {},
+    onEmote: () => {},
     onLangChange: () => {},
   };
 
@@ -46,6 +54,14 @@ export class Hud {
     $('#shop-close').addEventListener('click', () => this.closeShop());
     $('#orders-close').addEventListener('click', () => ($('#orders').hidden = true));
     this.bindStick();
+    for (const b of document.querySelectorAll<HTMLButtonElement>('#emotes button')) {
+      b.addEventListener('click', () => this.h.onEmote(b.dataset.e!));
+    }
+  }
+
+  /** Emotes only make sense with a partner in the garden. */
+  showEmotes(on: boolean) {
+    $('#emotes').hidden = !on;
   }
 
   get shopOpen() {
@@ -136,6 +152,7 @@ export class Hud {
         }
         return row;
       }),
+      this.animalRow(s),
     );
     $('#shop').hidden = false;
   }
@@ -149,8 +166,28 @@ export class Hud {
     $('#orders').hidden = true;
   }
 
+  private animalRow(s: FarmState) {
+    const row = document.createElement('div');
+    row.className = 'shop-row';
+    const spec = ANIMALS.chicken;
+    const locked = !isUnlocked(spec.unlock, s.xp);
+    const owned = s.animals.length;
+    const note = locked ? t('locked_at', { n: 2 }) : `${spec.cost} ${t('coins')} · ${owned}/${spec.capacity}`;
+    row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t('chick')}<small>${note}</small></span>`;
+    drawIcon(row.querySelector('canvas')!, 'chicken_0');
+    if (locked) row.classList.add('locked');
+    else {
+      const b = document.createElement('button');
+      b.textContent = t('buy');
+      b.disabled = s.coins < spec.cost || owned >= spec.capacity;
+      b.addEventListener('click', () => this.h.onBuyAnimal());
+      row.append(b);
+    }
+    return row;
+  }
+
   /** The village board: today's three orders with a Deliver button each. */
-  openOrders(s: FarmState, now: number) {
+  openOrders(s: FarmState, now: number, duo?: { uid: string; names: Record<string, string> }) {
     $('#orders-title').textContent = t('orders_title');
     $('#orders-close').textContent = t('close');
     const done = doneToday(s, now);
@@ -169,7 +206,30 @@ export class Hud {
         return row;
       }),
     );
+    if (duo) $('#orders-list').append(this.duoRow(s, now, duo.uid, duo.names));
     $('#orders').hidden = false;
+  }
+
+  /** The daily duo order: each partner hands in their half. */
+  private duoRow(s: FarmState, now: number, uid: string, names: Record<string, string>) {
+    const o = duoFor(vnDay(now), s.duo?.day === vnDay(now) ? s.duo.xp : s.xp);
+    const by = duoDelivered(s, now);
+    const row = document.createElement('div');
+    row.className = 'shop-row duo';
+    const status = Object.entries(names)
+      .map(([u, n]) => `${n} ${by.includes(u) ? '✓' : '…'}`)
+      .join(' · ');
+    const have = Math.min(haveCount(s, o.species), o.count);
+    row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">✋✋ ${t(`sp.${o.species}`)} ×${o.count} ${t('each')}<small></small></span>`;
+    row.querySelector('small')!.textContent = `${status} · +${o.coins} ${t('coins')} · +${o.xp} XP`;
+    drawIcon(row.querySelector('canvas')!, o.species);
+    const b = document.createElement('button');
+    const done = by.length >= 2;
+    b.textContent = done ? '✓' : by.includes(uid) ? '⏳' : t('deliver');
+    b.disabled = done || by.includes(uid) || have < o.count;
+    b.addEventListener('click', () => this.h.onDeliverDuo());
+    row.append(b);
+    return row;
   }
 
   private bindStick() {
@@ -203,11 +263,12 @@ export class Hud {
 }
 
 /** Copies the ready-stage crop texture into a hotbar icon. */
-let iconSource: ((id: SpeciesId) => HTMLCanvasElement | null) | null = null;
-export function setIconSource(fn: (id: SpeciesId) => HTMLCanvasElement | null) {
+let iconSource: ((id: string) => HTMLCanvasElement | null) | null = null;
+/** `id` is a crop or product id (drawn from its ready texture) or a texture key. */
+export function setIconSource(fn: (id: string) => HTMLCanvasElement | null) {
   iconSource = fn;
 }
-function drawIcon(cv: HTMLCanvasElement, id: SpeciesId) {
+function drawIcon(cv: HTMLCanvasElement, id: string) {
   const src = iconSource?.(id);
-  if (src) cv.getContext('2d')!.drawImage(src, 0, 0);
+  if (src) cv.getContext('2d')!.drawImage(src, 0, 0, cv.width, cv.height);
 }

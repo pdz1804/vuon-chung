@@ -17,16 +17,22 @@ import {
   type ActionResult,
 } from '../sim/farm';
 import { addMemory, partnerTendedToday, readLetters, sendLetter, treeStage, unreadFor } from '../sim/couple';
-import { fulfill } from '../sim/orders';
+import { animalPosition, buyAnimal, fedToday, fillFeeder, useAnimal } from '../sim/animals';
+import { deliverDuo, fulfill } from '../sim/orders';
 import { UNLOCKS, isUnlocked, levelFor } from '../sim/progression';
 import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, setIconSource } from '../ui/hud';
 import { Panels } from '../ui/panels';
 import { TILE, buildTextures } from './textures';
-import { BLOCKING, MAP_H, MAP_W, PROPS, SPAWN, buildGround, isFieldTile, propAt } from './world-map';
+import { BLOCKING, MAP_H, MAP_W, PEN, PROPS, SPAWN, buildGround, isFieldTile, propAt } from './world-map';
 
 const SPEED = 70; // px per second in world units
+/** Walking side by side with your partner is a little faster. */
+const TOGETHER_BOOST = 1.25;
+/** The only emotes the game sends or shows. */
+export const EMOTES = ['❤️', '👋', '🌱', '😂'];
+const CHICK_NAMES = ['Bông', 'Mít', 'Xôi', 'Na', 'Mochi', 'Bắp', 'Sữa', 'Kem'];
 type Facing = 'down' | 'up' | 'left' | 'right';
 const DIRS: Record<Facing, [number, number]> = { down: [0, 1], up: [0, -1], left: [-1, 0], right: [1, 0] };
 const SHORT: Record<Facing, Pose['f']> = { down: 'd', up: 'u', left: 'l', right: 'r' };
@@ -73,6 +79,11 @@ export class FarmScene extends Phaser.Scene {
   private mailHeart!: Phaser.GameObjects.Image;
   private sparkles = new Map<string, Phaser.GameObjects.Image>();
   private unread = 0;
+  private feederImg!: Phaser.GameObjects.Image;
+  private animalSprites = new Map<string, Phaser.GameObjects.Image>();
+  private seenEmote = new Map<string, number>();
+  private together = false;
+  private togetherToastAt = -Infinity;
   private busy = false;
   private presence?: Presence;
 
@@ -86,7 +97,10 @@ export class FarmScene extends Phaser.Scene {
     const me = this.store.uid ? this.store.profiles[this.store.uid] : undefined;
     this.look = me?.look ?? 'phu';
     buildTextures(this);
-    setIconSource((id) => this.textures.get(`${id}_4`).getSourceImage() as HTMLCanvasElement);
+    setIconSource((id) => {
+      const key = this.textures.exists(`${id}_4`) ? `${id}_4` : id;
+      return this.textures.get(key).getSourceImage() as HTMLCanvasElement;
+    });
     this.buildWorld();
     this.presence = this.boot.connectPresence?.((uid, p) => this.onPartner(uid, p));
 
@@ -128,6 +142,10 @@ export class FarmScene extends Phaser.Scene {
       onAction: () => void this.act(),
       onBuy: (id, n) => void this.run((s) => buySeeds(s, id, n)),
       onDeliver: (i) => void this.run((s, ts) => fulfill(s, i, ts)),
+      onDeliverDuo: () => void this.run((s, ts, uid) => deliverDuo(s, uid, ts)),
+      onBuyAnimal: () =>
+        void this.run((s, ts) => buyAnimal(s, 'chicken', CHICK_NAMES[s.animals.length % CHICK_NAMES.length], ts)),
+      onEmote: (e) => this.emote(e),
       onLangChange: () => this.refresh(),
     });
 
@@ -170,6 +188,7 @@ export class FarmScene extends Phaser.Scene {
       img.setDepth((p.y + p.h) * TILE);
       // The Memory Tree grows past its tile, so anchor it bottom-centre.
       if (p.id === 'sapling') this.tree = img.setOrigin(0.5, 1).setX(p.x * TILE + 8);
+      if (p.id === 'feeder') this.feederImg = img;
       if (p.id === 'mailbox') {
         this.mailHeart = this.add
           .image(p.x * TILE + 8, p.y * TILE - 4, 'heart')
@@ -226,7 +245,8 @@ export class FarmScene extends Phaser.Scene {
     if (!vx && !vy) ({ x: vx, y: vy } = this.hud.stick);
     if (this.hud.modalOpen || this.typing()) vx = vy = 0;
     const len = Math.hypot(vx, vy) || 1;
-    this.player.setVelocity((vx / len) * SPEED, (vy / len) * SPEED);
+    const speed = SPEED * (this.walkingTogether(vx || vy ? 1 : 0) ? TOGETHER_BOOST : 1);
+    this.player.setVelocity((vx / len) * speed, (vy / len) * speed);
 
     const moving = Math.abs(vx) > 0.3 || Math.abs(vy) > 0.3;
     if (moving) this.facing = Math.abs(vx) > Math.abs(vy) ? (vx > 0 ? 'right' : 'left') : vy > 0 ? 'down' : 'up';
@@ -236,6 +256,74 @@ export class FarmScene extends Phaser.Scene {
     this.cursor.setPosition(tx * TILE + 8, ty * TILE + 8);
     this.presence?.publish({ x: this.player.x, y: this.player.y, f: SHORT[this.facing], m: moving });
     this.updatePartners(dtMs);
+    this.updateAnimals();
+  }
+
+  /** True while you and your partner walk side by side (shows a toast once per stroll). */
+  private walkingTogether(moving: number): boolean {
+    const p = [...this.partners.values()][0];
+    const dist = p ? Math.hypot(p.sprite.x - this.player.x, p.sprite.y - this.player.y) : Infinity;
+    // Enter at 24px, leave at 36px, so network jitter doesn't flicker the state.
+    const near = !!p && moving > 0 && p.target.m && dist < (this.together ? 36 : 24);
+    if (near && !this.together && this.time.now - this.togetherToastAt > 15_000) {
+      this.togetherToastAt = this.time.now;
+      this.hud.toast(t('walk_together'));
+    }
+    this.together = near;
+    return near;
+  }
+
+  /** Chickens wander on a clock-derived path, identical on both phones. */
+  private updateAnimals() {
+    // Real time, not the game clock: wandering is cosmetic and must stay calm
+    // even when the dev clock runs fast.
+    const ts = Date.now();
+    const animals = this.store.farm.animals;
+    const alive = new Set(animals.map((a) => a.id));
+    for (const [id, s] of this.animalSprites) {
+      if (!alive.has(id)) {
+        s.destroy();
+        this.animalSprites.delete(id);
+      }
+    }
+    animals.forEach((a, i) => {
+      const pos = animalPosition(a.id, i, ts, PEN);
+      const s =
+        this.animalSprites.get(a.id) ?? this.animalSprites.set(a.id, this.add.image(0, 0, 'chicken_0')).get(a.id)!;
+      s.setPosition(pos.x, pos.y)
+        .setFlipX(pos.left)
+        .setTexture(`chicken_${pos.moving ? Math.floor(this.time.now / 180) % 2 : 0}`)
+        .setDepth(pos.y + 4);
+    });
+  }
+
+  /** Shows an emote bubble over a sprite for a few seconds. */
+  private bubble(over: Phaser.GameObjects.Sprite, e: string) {
+    const b = this.add
+      .text(over.x, over.y - 18, e, { fontSize: '24px' })
+      .setOrigin(0.5, 1)
+      .setScale(0.5)
+      .setDepth(9200);
+    const lift = { dy: 0 };
+    // Follow the avatar while it walks, then drift up and fade.
+    const follow = () => b.setPosition(over.x, over.y - 18 - lift.dy);
+    this.events.on('update', follow);
+    this.tweens.add({
+      targets: lift,
+      dy: 8,
+      delay: 1800,
+      duration: 700,
+      onUpdate: () => b.setAlpha(1 - lift.dy / 8),
+      onComplete: () => {
+        this.events.off('update', follow);
+        b.destroy();
+      },
+    });
+  }
+
+  private emote(e: string) {
+    this.bubble(this.player, e);
+    this.presence?.sendEmote(e);
   }
 
   /** Applies texture, flip, walk bob and depth for any avatar. */
@@ -256,8 +344,14 @@ export class FarmScene extends Phaser.Scene {
     }
     if (existing) {
       existing.target = p;
+      // A newer emote from the partner: show it once.
+      if (p.e && EMOTES.includes(p.e) && p.et && p.et > (this.seenEmote.get(uid) ?? 0)) {
+        if (this.seenEmote.has(uid)) this.bubble(existing.sprite, p.e);
+        this.seenEmote.set(uid, p.et);
+      }
       return;
     }
+    this.seenEmote.set(uid, p.et ?? 0);
     const profile = this.store.profiles[uid];
     const sprite = this.add.sprite(p.x, p.y, avatarTexture(profile?.look ?? 'su', LONG[p.f]));
     const tag = this.add
@@ -303,14 +397,26 @@ export class FarmScene extends Phaser.Scene {
   private async act() {
     if (this.hud.modalOpen) return;
     const [x, y] = this.target();
+    // Animals first: they stand on tiles that are otherwise free.
+    const cx = x * TILE + 8;
+    const cy = y * TILE + 8;
+    for (const a of this.store.farm.animals) {
+      const s = this.animalSprites.get(a.id);
+      if (s && Math.hypot(s.x - cx, s.y - cy) < 14) {
+        const id = a.id;
+        return this.run((st, ts, uid) => useAnimal(st, id, uid, ts));
+      }
+    }
     const prop = propAt(x, y);
+    if (prop?.id === 'feeder') return this.run((s, ts) => fillFeeder(s, ts));
+    if (prop?.id === 'coop') return this.hud.openShop(this.store.farm);
     if (prop?.id === 'bin') return this.run((s, ts) => ship(s, ts));
     if (prop?.id === 'stall') return this.hud.openShop(this.store.farm);
     if (prop?.id === 'sapling') return this.panels.openTree(this.store.farm, this.names());
     if (prop?.id === 'mailbox') return this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (prop?.id === 'board') {
       if (!isUnlocked('orders', this.store.farm.xp)) return this.hud.toast(t('locked_orders'));
-      return this.hud.openOrders(this.store.farm, now());
+      return this.hud.openOrders(this.store.farm, now(), this.duoContext());
     }
     if (!isFieldTile(x, y)) return this.hud.toast(t('cant_farm'));
     const selected = this.selected;
@@ -356,9 +462,11 @@ export class FarmScene extends Phaser.Scene {
     this.drawField();
     this.hud.render(this.store.farm, this.selected);
     if (this.hud.shopOpen) this.hud.openShop(this.store.farm);
-    if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now());
+    if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now(), this.duoContext());
     if (this.panels.mailOpen) this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (this.panels.treeOpen) this.panels.openTree(this.store.farm, this.names());
+    this.feederImg.setTexture(fedToday(this.store.farm, now()) ? 'feeder_full' : 'feeder');
+    this.hud.showEmotes(this.store.members.length >= 2);
     const stage = treeStage(this.store.farm);
     this.tree.setTexture(stage ? `memtree_${stage}` : 'sapling');
     const unread = unreadFor(this.store.farm, this.store.uid);
@@ -413,6 +521,11 @@ export class FarmScene extends Phaser.Scene {
     const el = document.activeElement;
     // A field inside a dialog closed with Esc keeps focus while hidden: ignore it.
     return (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.offsetParent !== null;
+  }
+
+  /** The duo order only exists when both partners are in the garden. */
+  private duoContext() {
+    return this.store.members.length >= 2 ? { uid: this.store.uid, names: this.names() } : undefined;
   }
 
   /** uid → display name, for letters and memories. */

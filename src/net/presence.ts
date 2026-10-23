@@ -20,6 +20,9 @@ export interface Pose {
   /** Moving or idle */
   m: boolean;
   t: number;
+  /** Last emote and when it was sent (ms). */
+  e?: string;
+  et?: number;
 }
 
 const MIN_INTERVAL_MS = 125;
@@ -53,8 +56,16 @@ export class Presence {
   }
 
   /** Throttled: sends only on change and at most every MIN_INTERVAL_MS. */
+  private emote?: { e: string; et: number };
+
+  /** Sends an emote with the next pose update (forced through the dedupe). */
+  sendEmote(e: string) {
+    this.emote = { e, et: Date.now() };
+    this.lastKey = '';
+  }
+
   publish(pose: Omit<Pose, 't'>) {
-    const k = `${Math.round(pose.x)},${Math.round(pose.y)},${pose.f},${pose.m}`;
+    const k = `${Math.round(pose.x)},${Math.round(pose.y)},${pose.f},${pose.m},${this.emote?.et ?? 0}`;
     const t = Date.now();
     if (k === this.lastKey) return;
     if (t - this.last < MIN_INTERVAL_MS) {
@@ -66,7 +77,7 @@ export class Presence {
     clearTimeout(this.trailing);
     this.lastKey = k;
     this.last = t;
-    void set(this.mine, { ...pose, x: Math.round(pose.x), y: Math.round(pose.y), t });
+    void set(this.mine, { ...pose, ...this.emote, x: Math.round(pose.x), y: Math.round(pose.y), t });
   }
 
   leave() {

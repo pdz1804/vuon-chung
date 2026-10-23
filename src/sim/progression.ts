@@ -20,7 +20,7 @@ export function levelProgress(xp: number): number {
 
 /** What each level opens up (only implemented features are listed). */
 export const UNLOCKS: Record<number, string[]> = {
-  2: ['orders'],
+  2: ['orders', 'chicken'],
   3: ['rose'],
 };
 

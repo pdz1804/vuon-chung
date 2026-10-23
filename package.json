@@ -16,7 +16,7 @@
     "prepare": "husky",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build",
     "test:rules": "firebase emulators:exec --only firestore --project demo-vuon-chung \"vitest run --config vitest.rules.config.ts\"",
-    "test:shared": "firebase emulators:exec --only auth,firestore,database --project demo-vuon-chung \"playwright test --project shared\""
+    "test:shared": "firebase emulators:exec --only auth,firestore,database --project demo-vuon-chung \"playwright test --project shared --workers=1\""
   },
   "dependencies": {
     "firebase": "^11.10.0",
