@@ -18,20 +18,25 @@ and set `CI=true` so the bundled Chromium is used instead.
 
 ## Scripts
 
-| Script                  | What it does                                               |
-| ----------------------- | ---------------------------------------------------------- |
-| `npm run dev`           | Vite dev server on port 5240                               |
-| `npm run build`         | Typecheck, then production build into `dist/`              |
-| `npm run lint`          | ESLint (type-aware for `src/`)                             |
-| `npm run format`        | Prettier, write                                            |
-| `npm run format:check`  | Prettier, check only                                       |
-| `npm run typecheck`     | `tsc --noEmit`                                             |
-| `npm test`              | Vitest unit tests                                          |
-| `npm run test:coverage` | Vitest with a V8 coverage report                           |
-| `npm run test:e2e`      | Playwright end-to-end tests (desktop and phone viewports)  |
-| `npm run check`         | format:check, lint, typecheck, unit tests and build in one |
+| Script                  | What it does                                                              |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `npm run dev`           | Vite dev server on port 5240                                              |
+| `npm run build`         | Typecheck, then production build into `dist/`                             |
+| `npm run lint`          | ESLint (type-aware for `src/`)                                            |
+| `npm run format`        | Prettier, write                                                           |
+| `npm run format:check`  | Prettier, check only                                                      |
+| `npm run typecheck`     | `tsc --noEmit`                                                            |
+| `npm test`              | Vitest unit tests                                                         |
+| `npm run test:coverage` | Vitest with a V8 coverage report                                          |
+| `npm run test:e2e`      | Playwright end-to-end tests (desktop, phone and shared)                   |
+| `npm run test:rules`    | Firestore security rules on the emulator (needs Java)                     |
+| `npm run test:shared`   | Two-player e2e on the Auth, Firestore and Database emulators (needs Java) |
+| `npm run check`         | format:check, lint, typecheck, unit tests and build in one                |
 
-Run `npm run check` before opening a pull request, and `npm run test:e2e` when you touched gameplay or UI.
+Run `npm run check` before opening a pull request, and the Playwright suites when you touched gameplay or UI.
+`npm run test:e2e` also runs the `shared` project, which expects the Firebase emulators; without Java use
+`npx playwright test --project desktop --project phone`, which is what the CI `e2e` job runs. Changes to
+`firestore.rules` or `database.rules.json` need `npm run test:rules` (and `npm run test:shared` for presence).
 
 ## Git hooks
 
@@ -55,20 +60,26 @@ feat(sim): regrow strawberries after the first harvest
 
 ## Testing the slow-growing parts
 
-Crops take real hours to grow. Two dev hooks make that testable:
+Crops take real hours to grow, and the default dev server opens the sign-in lobby. Dev hooks for solo play:
 
-- **Dev clock**: add `?speed=3600` to the URL (`http://localhost:5240/?speed=3600`) and one real second
-  counts as one game hour. The dev clock uses its own save slot, so your real farm is untouched.
+- **Solo farm**: `?local=1` runs a solo farm in `localStorage` on the real clock, with no Firebase.
+- **Dev clock**: add `?speed=3600` (`http://localhost:5240/?speed=3600`) and one real second counts as one
+  game hour. Any speed other than 1 is solo mode and uses its own save slot, so your real farm is untouched.
 - **`#qa` hook**: with `#qa` in the URL (for example `/?speed=3600#qa`) the game exposes
-  `window.__qa = { scene, farm() }` so tests can teleport the farmer and read the farm state. The
-  Playwright specs in `tests/e2e` use it.
+  `window.__qa = { scene, farm(), partners }` so tests can teleport the farmer and read or edit the farm state.
+  The Playwright specs in `tests/e2e` use it.
+- **Emulators**: `?emu=1` points the shared mode at the local Auth, Firestore and Database emulators and shows a
+  test login. `npm run test:shared` starts them for you.
 
 ## Where to put code
 
-- Game rules go in `src/sim` as pure functions that take `now` as an argument, with unit tests next to them.
+- Game rules go in `src/sim` as pure functions that take `now` (and the acting `uid`) as arguments, with unit tests
+  next to them. Never read the clock or touch Firebase there.
+- Anything that talks to Firebase goes in `src/net`. Rule changes need a matching test in `tests/rules`.
 - Phaser rendering and input go in `src/game`; the DOM overlay in `src/ui`; user-facing strings in
   `src/i18n.ts` (add both `vi` and `en`).
-- See [docs/architecture.md](docs/architecture.md) for the full picture.
+- See [docs/architecture.md](docs/architecture.md) for the full picture and [docs/game-design.md](docs/game-design.md)
+  for the rules and numbers.
 
 ## Pull requests
 
