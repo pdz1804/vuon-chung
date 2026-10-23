@@ -33,7 +33,10 @@ export function buildGround(): Ground[][] {
       if (border) k = 'tree';
       else if (x >= FIELD.x0 && x <= FIELD.x1 && y >= FIELD.y0 && y <= FIELD.y1) k = 'field';
       else if (
-        x >= FIELD.x0 - 1 && x <= FIELD.x1 + 1 && y >= FIELD.y0 - 1 && y <= FIELD.y1 + 1 &&
+        x >= FIELD.x0 - 1 &&
+        x <= FIELD.x1 + 1 &&
+        y >= FIELD.y0 - 1 &&
+        y <= FIELD.y1 + 1 &&
         !GATE.has(`${x},${y}`)
       )
         k = 'fence';
@@ -48,8 +51,7 @@ export function buildGround(): Ground[][] {
   return g;
 }
 
-export const isFieldTile = (x: number, y: number) =>
-  x >= FIELD.x0 && x <= FIELD.x1 && y >= FIELD.y0 && y <= FIELD.y1;
+export const isFieldTile = (x: number, y: number) => x >= FIELD.x0 && x <= FIELD.x1 && y >= FIELD.y0 && y <= FIELD.y1;
 
 export function propAt(x: number, y: number): Prop | undefined {
   return PROPS.find((p) => x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h);

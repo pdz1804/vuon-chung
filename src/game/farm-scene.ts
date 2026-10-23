@@ -6,8 +6,18 @@ import { t } from '../i18n';
 import { saveFarm } from '../save';
 import { isWilted, progress } from '../sim/growth';
 import {
-  buySeeds, cropStage, harvest, key, payout, plant, plotState, ship, till, water,
-  type ActionResult, type FarmState,
+  buySeeds,
+  cropStage,
+  harvest,
+  key,
+  payout,
+  plant,
+  plotState,
+  ship,
+  till,
+  water,
+  type ActionResult,
+  type FarmState,
 } from '../sim/farm';
 import { SPECIES, SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, setIconSource } from '../ui/hud';
@@ -69,7 +79,10 @@ export class FarmScene extends Phaser.Scene {
     this.physics.add.collider(this.player, walls);
 
     this.cursor = this.add.rectangle(0, 0, TILE, TILE).setStrokeStyle(1, 0xffffff, 0.9).setDepth(9000);
-    this.night = this.add.rectangle(0, 0, MAP_W * TILE, MAP_H * TILE, 0x1a2350, 0).setOrigin(0).setDepth(9500);
+    this.night = this.add
+      .rectangle(0, 0, MAP_W * TILE, MAP_H * TILE, 0x1a2350, 0)
+      .setOrigin(0)
+      .setDepth(9500);
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
@@ -79,11 +92,16 @@ export class FarmScene extends Phaser.Scene {
     this.fitZoom();
 
     const kb = this.input.keyboard!;
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE') as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE') as Record<
+      string,
+      Phaser.Input.Keyboard.Key
+    >;
     kb.on('keydown-SPACE', () => this.act());
     kb.on('keydown-E', () => this.act());
     kb.on('keydown-ESC', () => this.hud.closeShop());
-    (['ONE', 'TWO', 'THREE'] as const).forEach((k, i) => kb.on(`keydown-${k}`, () => !this.hud.shopOpen && this.selectSeed(SPECIES_IDS[i])));
+    (['ONE', 'TWO', 'THREE'] as const).forEach((k, i) =>
+      kb.on(`keydown-${k}`, () => !this.hud.shopOpen && this.selectSeed(SPECIES_IDS[i])),
+    );
 
     this.hud = new Hud({
       onSelectSeed: (id) => this.selectSeed(id),
@@ -159,7 +177,8 @@ export class FarmScene extends Phaser.Scene {
     if (state === 'needs_water') return this.report(water(this.farm, x, y, ts));
     if (state === 'ready') return this.report(harvest(this.farm, x, y, ts), true);
     const crop = plot.crop!;
-    const growMs = crop.harvests && SPECIES[crop.species].regrowMs ? SPECIES[crop.species].regrowMs! : SPECIES[crop.species].growMs;
+    const growMs =
+      crop.harvests && SPECIES[crop.species].regrowMs ? SPECIES[crop.species].regrowMs! : SPECIES[crop.species].growMs;
     this.hud.toast(t('growing', { species: crop.species, pct: Math.floor(progress(crop, growMs, ts) * 100) }));
   }
 

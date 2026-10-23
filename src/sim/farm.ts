@@ -83,7 +83,7 @@ export function plant(s: FarmState, x: number, y: number, species: SpeciesId, no
   if (!plot) return { ok: false, msg: 'not_tilled' };
   if (plot.crop) return { ok: false, msg: 'occupied' };
   if (!s.seeds[species]) return { ok: false, msg: 'no_seeds', vars: { species } };
-  s.seeds[species]! -= 1;
+  s.seeds[species] -= 1;
   plot.crop = { species, plantedAt: now, waterings: [], harvests: 0 };
   return { ok: true, msg: 'planted', vars: { species } };
 }

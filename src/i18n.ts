@@ -106,7 +106,7 @@ export function setLang(l: Lang) {
 
 export function t(k: string, vars: Record<string, string | number> = {}): string {
   const template = dicts[lang][k as MsgKey] ?? k;
-  return template.replace(/\{(\w+)\}/g, (_, v) => {
+  return template.replace(/\{(\w+)\}/g, (_match: string, v: string) => {
     const val = vars[v];
     if (v === 'species' && typeof val === 'string') return dicts[lang][`sp.${val}` as MsgKey] ?? val;
     if (v === 'stars' && typeof val === 'number') return '★'.repeat(val);

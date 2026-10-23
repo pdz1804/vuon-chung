@@ -19,9 +19,34 @@ export interface Species {
 }
 
 export const SPECIES: Record<SpeciesId, Species> = {
-  rau_muong: { id: 'rau_muong', seedCost: 5, growMs: 4 * HOUR, yield: 1, sellPrice: 12, xp: 2, color: { leaf: '#4caf50', fruit: '#2e7d32' } },
-  strawberry: { id: 'strawberry', seedCost: 15, growMs: 12 * HOUR, regrowMs: 8 * HOUR, yield: 2, sellPrice: 8, xp: 3, color: { leaf: '#43a047', fruit: '#e53950' } },
-  sunflower: { id: 'sunflower', seedCost: 20, growMs: 24 * HOUR, yield: 1, sellPrice: 45, xp: 5, color: { leaf: '#558b2f', fruit: '#fbc02d' } },
+  rau_muong: {
+    id: 'rau_muong',
+    seedCost: 5,
+    growMs: 4 * HOUR,
+    yield: 1,
+    sellPrice: 12,
+    xp: 2,
+    color: { leaf: '#4caf50', fruit: '#2e7d32' },
+  },
+  strawberry: {
+    id: 'strawberry',
+    seedCost: 15,
+    growMs: 12 * HOUR,
+    regrowMs: 8 * HOUR,
+    yield: 2,
+    sellPrice: 8,
+    xp: 3,
+    color: { leaf: '#43a047', fruit: '#e53950' },
+  },
+  sunflower: {
+    id: 'sunflower',
+    seedCost: 20,
+    growMs: 24 * HOUR,
+    yield: 1,
+    sellPrice: 45,
+    xp: 5,
+    color: { leaf: '#558b2f', fruit: '#fbc02d' },
+  },
 };
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[];

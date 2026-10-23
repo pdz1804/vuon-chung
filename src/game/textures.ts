@@ -9,7 +9,7 @@ type Ctx = CanvasRenderingContext2D;
 
 /** Deterministic noise so tiles look hand-placed but identical every load. */
 function rng(seed: number) {
-  return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
 }
 
 function make(scene: Phaser.Scene, key: string, draw: (c: Ctx) => void, w = TILE, h = TILE) {
@@ -57,9 +57,7 @@ const PLAYER_DOWN = [
   '................',
 ];
 const PLAYER_UP = PLAYER_DOWN.map((r, i) => (i >= 3 && i <= 6 ? '....HHHHHHHH....' : r));
-const PLAYER_SIDE = PLAYER_DOWN.map((r, i) =>
-  i === 4 ? '....SSSSSSES....' : i === 6 ? '.....SSSSRS.....' : r,
-);
+const PLAYER_SIDE = PLAYER_DOWN.map((r, i) => (i === 4 ? '....SSSSSSES....' : i === 6 ? '.....SSSSRS.....' : r));
 
 export const AVATARS = {
   phu: { H: '#3b2a20', S: '#f1c9a5', E: '#222', R: '#d9846b', C: '#3f7fbf', P: '#3c4a5c', B: '#4a3426' },
@@ -229,7 +227,12 @@ function drawCrop(c: Ctx, id: string, st: number, leaf: string, fruit: string) {
   }
   if (st === 4) {
     if (id === 'strawberry') {
-      for (const [x, y] of [[3, 9], [7, 6], [11, 9], [9, 11]]) {
+      for (const [x, y] of [
+        [3, 9],
+        [7, 6],
+        [11, 9],
+        [9, 11],
+      ]) {
         fill(c, fruit, x, y, 2, 2);
         fill(c, '#fff3', x, y);
       }
