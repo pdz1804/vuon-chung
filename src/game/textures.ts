@@ -176,6 +176,51 @@ export function buildTextures(scene: Phaser.Scene) {
     fill(c, '#d94a4a', 4, 4, 2, 1);
     fill(c, '#d94a4a', 10, 4, 2, 1);
   });
+  make(scene, 'mailbox', (c) => {
+    fill(c, '#7a5232', 7, 8, 2, 8);
+    fill(c, '#d94a4a', 3, 3, 10, 6);
+    fill(c, '#b33a3a', 3, 8, 10, 1);
+    fill(c, '#fdf8ec', 5, 5, 4, 2);
+    fill(c, '#ffd54a', 12, 2, 1, 4);
+    fill(c, '#ffd54a', 13, 2, 2, 2);
+  });
+  make(scene, 'heart', (c) =>
+    art(c, ['.RR.RR.', 'RRRRRRR', 'RRRRRRR', '.RRRRR.', '..RRR..', '...R...'], { R: '#ff5f8a' }, 4, 5),
+  );
+  make(scene, 'sparkle', (c) => {
+    fill(c, '#fff6a8', 7, 2, 2, 4);
+    fill(c, '#fff6a8', 5, 3, 6, 2);
+    fill(c, '#ffffff', 7, 3, 2, 2);
+    fill(c, '#fff6a8', 12, 9, 1, 3);
+    fill(c, '#fff6a8', 11, 10, 3, 1);
+  });
+  // Memory Tree, stages 1–4 (stage 0 is the 'sapling' prop texture).
+  for (let st = 1; st <= 4; st++) {
+    const size = st <= 1 ? 16 : st === 2 ? 24 : 32;
+    make(
+      scene,
+      `memtree_${st}`,
+      (c) => {
+        const cx = size / 2;
+        const trunkH = Math.round(size * 0.35);
+        fill(c, '#7a5232', cx - 1, size - trunkH, 2 + (st > 2 ? 1 : 0), trunkH);
+        const r = Math.round(size * 0.32);
+        const cy = size - trunkH - r + 2;
+        for (let y = -r; y <= r; y++) {
+          for (let x = -r - 1; x <= r + 1; x++) {
+            if (x * x + y * y * 1.3 <= r * r) fill(c, (x + y) % 3 === 0 ? '#62b04e' : '#3f8f3a', cx + x, cy + y);
+          }
+        }
+        // Blossoms: more with each stage, one per memory feel.
+        const r2 = rng(st * 7);
+        for (let i = 0; i < st * 3; i++) {
+          fill(c, '#f7a8c4', cx + Math.round((r2() - 0.5) * r * 1.6), cy + Math.round((r2() - 0.5) * r * 1.4));
+        }
+      },
+      size,
+      size,
+    );
+  }
   make(scene, 'raindrop', (c) => fill(c, '#cfe8ff', 0, 0, 1, 3), 1, 3);
   make(scene, 'sapling', (c) =>
     art(

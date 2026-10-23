@@ -30,8 +30,8 @@ async function standFacing(page: Page, x: number, y: number) {
 }
 
 test('two partners share one garden and see each other', async ({ browser }) => {
-  const a = await (await browser.newContext()).newPage();
-  const b = await (await browser.newContext()).newPage();
+  const a = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
+  const b = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
 
   // Alice creates the garden and gets an invite link.
   await a.goto('/?emu=1#qa');
@@ -63,16 +63,38 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await a.keyboard.press('Space');
   await b.waitForFunction(() => window.__qa.farm().plots['12,11'].crop?.species === 'rau_muong');
 
+  // A letter from Alice reaches Bob's mailbox.
+  await standFacing(a, 7, 4);
+  await a.keyboard.press('Space');
+  await expect(a.locator('#mail')).toBeVisible();
+  await a.locator('#mail-text').fill('Chào anh 🌱');
+  await a.locator('#mail-form button').click();
+  await expect(a.locator('#mail-list')).toContainText('Chào anh');
+  await a.locator('#mail-close').click();
+  await expect(b.locator('#toast')).toContainText(/thư|letter/i);
+  await standFacing(b, 7, 4);
+  await b.keyboard.press('Space');
+  await expect(b.locator('#mail-list .letter').first()).toContainText('Chào anh');
+  await b.locator('#mail-close').click();
+
+  // A memory added by Bob shows on Alice's Memory Tree.
+  await standFacing(b, 15, 3);
+  await b.keyboard.press('Space');
+  await b.locator('#tree-title').fill('Lần đầu gặp nhau');
+  await b.locator('#tree-form button').click();
+  await expect(b.locator('#tree-list')).toContainText('Lần đầu gặp nhau');
+  await a.waitForFunction(() => (window.__qa.farm() as unknown as { memories: unknown[] }).memories.length === 1);
+
   // An invite can't be reused by a third person.
-  const c = await (await browser.newContext()).newPage();
+  const c = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
   await c.goto(`/?join=${url.searchParams.get('join')}&emu=1`);
   await signIn(c, 'carol');
   await expect(c.locator('#lobby-error')).not.toBeEmpty();
 });
 
 test('an invite wins over a garden you started alone', async ({ browser }) => {
-  const a = await (await browser.newContext()).newPage();
-  const b = await (await browser.newContext()).newPage();
+  const a = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
+  const b = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
 
   // Bob starts a solo garden first.
   await b.goto('/?emu=1#qa');

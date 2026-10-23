@@ -16,11 +16,13 @@ import {
   vnDay,
   type ActionResult,
 } from '../sim/farm';
+import { addMemory, partnerTendedToday, readLetters, sendLetter, treeStage, unreadFor } from '../sim/couple';
 import { fulfill } from '../sim/orders';
 import { UNLOCKS, isUnlocked, levelFor } from '../sim/progression';
 import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, setIconSource } from '../ui/hud';
+import { Panels } from '../ui/panels';
 import { TILE, buildTextures } from './textures';
 import { BLOCKING, MAP_H, MAP_W, PROPS, SPAWN, buildGround, isFieldTile, propAt } from './world-map';
 
@@ -66,6 +68,11 @@ export class FarmScene extends Phaser.Scene {
   private level = 0;
   private rain?: Phaser.GameObjects.Particles.ParticleEmitter;
   private wasRaining = false;
+  private panels!: Panels;
+  private tree!: Phaser.GameObjects.Image;
+  private mailHeart!: Phaser.GameObjects.Image;
+  private sparkles = new Map<string, Phaser.GameObjects.Image>();
+  private unread = 0;
   private busy = false;
   private presence?: Presence;
 
@@ -91,17 +98,31 @@ export class FarmScene extends Phaser.Scene {
     this.fitZoom();
 
     const kb = this.input.keyboard!;
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE,FOUR') as Record<
+    // enableCapture=false: keys must still reach the letter and memory text boxes.
+    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE,FOUR', false) as Record<
       string,
       Phaser.Input.Keyboard.Key
     >;
-    kb.on('keydown-SPACE', () => void this.act());
-    kb.on('keydown-E', () => void this.act());
-    kb.on('keydown-ESC', () => this.hud.closeModals());
+    kb.on('keydown-SPACE', (e: KeyboardEvent) => {
+      if (this.typing()) return;
+      e.preventDefault(); // no page scroll
+      void this.act();
+    });
+    kb.on('keydown-E', () => !this.typing() && void this.act());
+    kb.on('keydown-ESC', () => {
+      this.hud.closeModals();
+      this.panels.close();
+    });
     (['ONE', 'TWO', 'THREE', 'FOUR'] as const).forEach((k, i) =>
-      kb.on(`keydown-${k}`, () => !this.hud.shopOpen && this.selectSeed(SPECIES_IDS[i])),
+      kb.on(`keydown-${k}`, () => !this.typing() && !this.hud.modalOpen && this.selectSeed(SPECIES_IDS[i])),
     );
 
+    this.panels = new Panels({
+      sendLetter: async (text) => (await this.run((s, ts, uid) => sendLetter(s, uid, text, ts)))?.ok ?? false,
+      readLetters: () => void this.store.apply((s, _, uid) => readLetters(s, uid)).catch(console.error),
+      addMemory: async (date, title) =>
+        (await this.run((s, ts, uid) => addMemory(s, uid, date, title, ts)))?.ok ?? false,
+    });
     this.hud.bind({
       onSelectSeed: (id) => this.selectSeed(id),
       onAction: () => void this.act(),
@@ -115,6 +136,7 @@ export class FarmScene extends Phaser.Scene {
 
     this.refresh();
     if (this.boot.isNew) this.hud.toast(t('welcome'));
+    this.showAwaySummary();
 
     // Growth is derived from time, so the field just redraws periodically.
     this.time.addEvent({ delay: 1000, loop: true, callback: () => this.tick() });
@@ -146,6 +168,15 @@ export class FarmScene extends Phaser.Scene {
     for (const p of PROPS) {
       const img = this.add.image(p.x * TILE, (p.y + p.h) * TILE, p.id).setOrigin(0, 1);
       img.setDepth((p.y + p.h) * TILE);
+      // The Memory Tree grows past its tile, so anchor it bottom-centre.
+      if (p.id === 'sapling') this.tree = img.setOrigin(0.5, 1).setX(p.x * TILE + 8);
+      if (p.id === 'mailbox') {
+        this.mailHeart = this.add
+          .image(p.x * TILE + 8, p.y * TILE - 4, 'heart')
+          .setDepth(9050)
+          .setVisible(false);
+        this.tweens.add({ targets: this.mailHeart, y: '-=3', yoyo: true, repeat: -1, duration: 600 });
+      }
       walls.add(this.add.zone(p.x * TILE + (p.w * TILE) / 2, p.y * TILE + (p.h * TILE) / 2, p.w * TILE, p.h * TILE));
     }
 
@@ -193,7 +224,7 @@ export class FarmScene extends Phaser.Scene {
     let vx = (k.D.isDown || k.RIGHT.isDown ? 1 : 0) - (k.A.isDown || k.LEFT.isDown ? 1 : 0);
     let vy = (k.S.isDown || k.DOWN.isDown ? 1 : 0) - (k.W.isDown || k.UP.isDown ? 1 : 0);
     if (!vx && !vy) ({ x: vx, y: vy } = this.hud.stick);
-    if (this.hud.modalOpen) vx = vy = 0;
+    if (this.hud.modalOpen || this.typing()) vx = vy = 0;
     const len = Math.hypot(vx, vy) || 1;
     this.player.setVelocity((vx / len) * SPEED, (vy / len) * SPEED);
 
@@ -275,27 +306,32 @@ export class FarmScene extends Phaser.Scene {
     const prop = propAt(x, y);
     if (prop?.id === 'bin') return this.run((s, ts) => ship(s, ts));
     if (prop?.id === 'stall') return this.hud.openShop(this.store.farm);
-    if (prop?.id === 'sapling') return this.hud.toast(t('tree'));
+    if (prop?.id === 'sapling') return this.panels.openTree(this.store.farm, this.names());
+    if (prop?.id === 'mailbox') return this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (prop?.id === 'board') {
       if (!isUnlocked('orders', this.store.farm.xp)) return this.hud.toast(t('locked_orders'));
       return this.hud.openOrders(this.store.farm, now());
     }
     if (!isFieldTile(x, y)) return this.hud.toast(t('cant_farm'));
     const selected = this.selected;
-    return this.run((s, ts) => useTile(s, x, y, selected, ts));
+    return this.run((s, ts, uid) => useTile(s, x, y, selected, ts, uid));
   }
 
   /** Runs one action through the store and reports it. One at a time. */
-  private async run(action: (s: typeof this.store.farm, ts: number) => ActionResult) {
-    if (this.busy) return;
+  private async run(
+    action: (s: typeof this.store.farm, ts: number, uid: string) => ActionResult,
+  ): Promise<ActionResult | null> {
+    if (this.busy) return null;
     this.busy = true;
     try {
       const r = await this.store.apply(action);
       this.hud.toast(t(r.msg, r.vars));
       if (r.ok) this.refresh();
+      return r;
     } catch (e) {
       console.error(e);
       this.hud.toast(t('sync_error'));
+      return null;
     } finally {
       this.busy = false;
     }
@@ -321,6 +357,14 @@ export class FarmScene extends Phaser.Scene {
     this.hud.render(this.store.farm, this.selected);
     if (this.hud.shopOpen) this.hud.openShop(this.store.farm);
     if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now());
+    if (this.panels.mailOpen) this.panels.openMail(this.store.farm, this.store.uid, this.names());
+    if (this.panels.treeOpen) this.panels.openTree(this.store.farm, this.names());
+    const stage = treeStage(this.store.farm);
+    this.tree.setTexture(stage ? `memtree_${stage}` : 'sapling');
+    const unread = unreadFor(this.store.farm, this.store.uid);
+    this.mailHeart.setVisible(unread > 0);
+    if (unread > this.unread) this.hud.toast(t('new_letter'));
+    this.unread = unread;
     this.tick();
   }
 
@@ -364,6 +408,45 @@ export class FarmScene extends Phaser.Scene {
     this.rain?.[raining ? 'start' : 'stop']();
   }
 
+  /** True while a text field has focus: game hotkeys must not steal keystrokes. */
+  private typing(): boolean {
+    const el = document.activeElement;
+    // A field inside a dialog closed with Esc keeps focus while hidden: ignore it.
+    return (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.offsetParent !== null;
+  }
+
+  /** uid → display name, for letters and memories. */
+  private names(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [uid, p] of Object.entries(this.store.profiles)) out[uid] = p.name;
+    return out;
+  }
+
+  /** On arrival, summarise what the partner did since this device last saw the farm. */
+  private showAwaySummary() {
+    if (this.store.members.length < 2) return;
+    const key = `vuon-chung:seen:${this.store.worldId}:${this.store.uid}`;
+    let since = 0;
+    try {
+      since = Number(localStorage.getItem(key)) || 0;
+    } catch {
+      /* storage blocked */
+    }
+    const partner = this.store.members.find((m) => m !== this.store.uid);
+    if (since)
+      this.panels.openAway(this.store.farm, this.store.uid, since, this.store.profiles[partner ?? '']?.name ?? '♥');
+    const mark = () => {
+      try {
+        localStorage.setItem(key, String(now()));
+      } catch {
+        /* ignore */
+      }
+    };
+    mark();
+    this.time.addEvent({ delay: 30_000, loop: true, callback: mark });
+    window.addEventListener('beforeunload', mark);
+  }
+
   /** Syncs soil and crop images with the farm state. */
   private drawField() {
     const ts = now();
@@ -375,6 +458,18 @@ export class FarmScene extends Phaser.Scene {
       const soilTex = wet ? 'soil_wet' : 'soil';
       const soil = this.soil.get(k) ?? this.soil.set(k, this.add.image(px, py, soilTex).setDepth(1)).get(k)!;
       soil.setTexture(soilTex);
+
+      // A sparkle marks plants your partner cared for today: tend them for ✋✋.
+      const glow = !!plot.crop && partnerTendedToday(plot.crop, this.store.uid, ts);
+      const sp = this.sparkles.get(k);
+      if (glow && !sp) {
+        const img = this.add.image(px + 4, py - 8, 'sparkle').setDepth(9020);
+        this.tweens.add({ targets: img, alpha: 0.3, yoyo: true, repeat: -1, duration: 700 });
+        this.sparkles.set(k, img);
+      } else if (!glow && sp) {
+        sp.destroy();
+        this.sparkles.delete(k);
+      }
 
       const existing = this.crops.get(k);
       if (!plot.crop) {

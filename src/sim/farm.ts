@@ -1,6 +1,7 @@
 // Farm state and the actions players take on it. Pure: every action receives `now`,
 // so the same code can later run against the shared Firestore world.
 import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type CropTimes } from './growth';
+import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
 import { SPECIES, sellPrice, type SpeciesId } from './species';
 import { rainWaterings } from './weather';
@@ -12,6 +13,8 @@ export interface Crop extends CropTimes {
   species: SpeciesId;
   /** Number of completed harvests (regrowing plants keep counting). */
   harvests: number;
+  /** Vietnam day → uids who cared for it that day ("both hands" bonus). */
+  care?: Record<string, string[]>;
 }
 
 export interface Plot {
@@ -33,6 +36,9 @@ export interface FarmState {
   /** Village orders completed today (indices into ordersFor(day)). */
   /** `xp` freezes which crops today's board may ask for, so it can't reshuffle mid-day. */
   orders: { day: string; done: number[]; xp?: number };
+  letters: Letter[];
+  memories: Memory[];
+  feed: FeedEvent[];
 }
 
 export type ActionResult =
@@ -50,6 +56,9 @@ export function newFarm(): FarmState {
     bin: {},
     binDay: null,
     orders: { day: '', done: [] },
+    letters: [],
+    memories: [],
+    feed: [],
   };
 }
 
@@ -93,22 +102,31 @@ export function till(s: FarmState, x: number, y: number): ActionResult {
   return { ok: true, msg: 'tilled' };
 }
 
-export function plant(s: FarmState, x: number, y: number, species: SpeciesId, now: number): ActionResult {
+export function plant(
+  s: FarmState,
+  x: number,
+  y: number,
+  species: SpeciesId,
+  now: number,
+  uid = 'local',
+): ActionResult {
   const plot = s.plots[key(x, y)];
   if (!plot) return { ok: false, msg: 'not_tilled' };
   if (plot.crop) return { ok: false, msg: 'occupied' };
   if (!s.seeds[species]) return { ok: false, msg: 'no_seeds', vars: { species } };
   s.seeds[species] -= 1;
   plot.crop = { species, plantedAt: now, waterings: [], harvests: 0 };
+  markCare(plot.crop, uid, now);
   return { ok: true, msg: 'planted', vars: { species } };
 }
 
-export function water(s: FarmState, x: number, y: number, now: number): ActionResult {
+export function water(s: FarmState, x: number, y: number, now: number, uid = 'local'): ActionResult {
   const crop = s.plots[key(x, y)]?.crop;
   if (!crop) return { ok: false, msg: 'nothing_to_water' };
   if (isHydrated(withRain(crop, now), now)) return { ok: false, msg: 'already_wet' };
   crop.waterings.push(now);
-  return { ok: true, msg: 'watered' };
+  markCare(crop, uid, now);
+  return { ok: true, msg: bothHandsToday(crop, now) ? 'watered_both' : 'watered' };
 }
 
 export function harvest(s: FarmState, x: number, y: number, now: number): ActionResult {
@@ -117,7 +135,7 @@ export function harvest(s: FarmState, x: number, y: number, now: number): Action
   if (!plot || !crop) return { ok: false, msg: 'nothing_here' };
   if (cropStage(crop, now) !== 4) return { ok: false, msg: 'not_ready' };
   const sp = SPECIES[crop.species];
-  const stars = qualityStars(withRain(crop, now), growMsFor(crop), now);
+  const stars = qualityStars(withRain(crop, now), growMsFor(crop), now, hadBothHands(crop));
   const item = `${crop.species}:${stars}`;
   s.produce[item] = (s.produce[item] ?? 0) + sp.yield;
   s.xp += sp.xp * stars;
@@ -127,6 +145,7 @@ export function harvest(s: FarmState, x: number, y: number, now: number): Action
     crop.harvests += 1;
     crop.plantedAt = now;
     crop.waterings = wet;
+    crop.care = {};
   } else {
     delete plot.crop;
   }
@@ -201,13 +220,23 @@ export function isFromNewerApp(s: FarmState): boolean {
  * Running the decision inside the transaction means two players acting at once
  * can't both harvest the same plant or till the same tile twice.
  */
-export function useTile(s: FarmState, x: number, y: number, selected: SpeciesId, now: number): ActionResult {
+export function useTile(
+  s: FarmState,
+  x: number,
+  y: number,
+  selected: SpeciesId,
+  now: number,
+  uid = 'local',
+): ActionResult {
   const plot = s.plots[key(x, y)];
   if (!plot) return till(s, x, y);
   const state = plotState(plot, now);
-  if (state === 'empty') return plant(s, x, y, selected, now);
-  if (state === 'needs_water') return water(s, x, y, now);
+  if (state === 'empty') return plant(s, x, y, selected, now, uid);
+  if (state === 'needs_water') return water(s, x, y, now, uid);
   if (state === 'ready') return harvest(s, x, y, now);
+  // Already watered (or rained on): tending still counts toward "both hands".
+  const tended = tend(s, x, y, uid, now);
+  if (tended) return tended;
   const crop = plot.crop!;
   return {
     ok: false,

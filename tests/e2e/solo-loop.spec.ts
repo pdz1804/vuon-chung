@@ -95,3 +95,15 @@ test('order board unlocks at level 2 and pays for a delivery', async ({ page }) 
   await expect(page.locator('#orders-list button').first()).toHaveText('✓');
   expect(await page.evaluate(() => (window.__qa.farm() as unknown as { coins: number }).coins)).toBeGreaterThan(coins);
 });
+
+test('typing a letter keeps every key (spaces, WASD, digits)', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'physical keyboard only');
+  await page.goto(URL);
+  await page.waitForFunction(() => window.__qa);
+  await standFacing(page, 7, 4); // mailbox
+  await page.keyboard.press('Space');
+  await expect(page.locator('#mail')).toBeVisible();
+  await page.locator('#mail-text').click();
+  await page.keyboard.type('hello world wasd e 1234');
+  await expect(page.locator('#mail-text')).toHaveValue('hello world wasd e 1234');
+});

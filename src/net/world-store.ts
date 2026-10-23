@@ -16,7 +16,11 @@ import {
 import { now as clockNow, setClockOffset } from '../clock';
 import { loadFarm, saveFarm } from '../save';
 import { isFromNewerApp, migrate, newFarm, type ActionResult, type FarmState } from '../sim/farm';
+import { FEED_WORTHY, logEvent } from '../sim/couple';
 import { db } from './firebase';
+
+/** The single player of a solo farm. */
+export const LOCAL_UID = 'local';
 
 export type Look = 'phu' | 'su';
 export interface Profile {
@@ -31,12 +35,13 @@ interface WorldDoc {
   farm?: unknown;
 }
 
-export type Action = (s: FarmState, now: number) => ActionResult;
+/** An action runs on the freshest state with the acting player's uid. */
+export type Action = (s: FarmState, now: number, uid: string) => ActionResult;
 
 export interface WorldStore {
   readonly farm: FarmState;
   readonly worldId: string | null;
-  readonly uid: string | null;
+  readonly uid: string;
   readonly profiles: Record<string, Profile>;
   readonly members: string[];
   apply(action: Action): Promise<ActionResult>;
@@ -48,7 +53,7 @@ export interface WorldStore {
 export class LocalStore implements WorldStore {
   farm: FarmState;
   readonly worldId = null;
-  readonly uid = null;
+  readonly uid = LOCAL_UID;
   readonly profiles: Record<string, Profile> = {};
   readonly members: string[] = [];
   readonly isNew: boolean;
@@ -60,8 +65,12 @@ export class LocalStore implements WorldStore {
   }
 
   apply(action: Action) {
-    const r = action(this.farm, clockNow());
-    if (r.ok) saveFarm(this.farm);
+    const now = clockNow();
+    const r = action(this.farm, now, LOCAL_UID);
+    if (r.ok) {
+      if (FEED_WORTHY.has(r.msg)) logEvent(this.farm, { t: now, uid: LOCAL_UID, msg: r.msg, vars: r.vars });
+      saveFarm(this.farm);
+    }
     return Promise.resolve(r);
   }
 
@@ -115,8 +124,12 @@ export class SharedStore implements WorldStore {
       const farm = migrate((snap.data() as WorldDoc | undefined)?.farm);
       // Never write a farm saved by a newer version of the game: reload instead.
       if (isFromNewerApp(farm)) return { ok: false, msg: 'update_app' };
-      const r = action(farm, clockNow());
-      if (r.ok) tx.update(ref, { farm, updatedAt: serverTimestamp() });
+      const now = clockNow();
+      const r = action(farm, now, this.uid);
+      if (r.ok) {
+        if (FEED_WORTHY.has(r.msg)) logEvent(farm, { t: now, uid: this.uid, msg: r.msg, vars: r.vars });
+        tx.update(ref, { farm, updatedAt: serverTimestamp() });
+      }
       return r;
     });
   }

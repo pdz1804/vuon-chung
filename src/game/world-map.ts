@@ -5,7 +5,7 @@ export const MAP_H = 22;
 export type Ground = 'grass' | 'path' | 'water' | 'fence' | 'tree' | 'field';
 
 export interface Prop {
-  id: 'house' | 'bin' | 'stall' | 'sapling' | 'board';
+  id: 'house' | 'bin' | 'stall' | 'sapling' | 'board' | 'mailbox';
   x: number;
   y: number;
   w: number;
@@ -18,6 +18,7 @@ export const PROPS: Prop[] = [
   { id: 'stall', x: 24, y: 3, w: 2, h: 2 },
   { id: 'sapling', x: 15, y: 3, w: 1, h: 1 },
   { id: 'board', x: 21, y: 4, w: 1, h: 1 },
+  { id: 'mailbox', x: 7, y: 4, w: 1, h: 1 },
 ];
 
 export const FIELD = { x0: 9, y0: 9, x1: 22, y1: 16 };

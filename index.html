@@ -67,6 +67,37 @@
           <p id="lobby-error" role="alert"></p>
         </div>
       </div>
+      <div id="mail" class="modal" hidden>
+        <div class="sheet">
+          <h2 data-t="mail_title"></h2>
+          <div id="mail-list" class="scroll"></div>
+          <form id="mail-form">
+            <textarea id="mail-text" rows="3"></textarea>
+            <button type="submit" data-t="send"></button>
+          </form>
+          <button id="mail-close" class="btn close" type="button" data-t="close"></button>
+        </div>
+      </div>
+      <div id="tree" class="modal" hidden>
+        <div class="sheet">
+          <h2 data-t="tree_title"></h2>
+          <p id="tree-count" class="muted"></p>
+          <ol id="tree-list" class="scroll"></ol>
+          <form id="tree-form">
+            <input id="tree-date" type="date" />
+            <input id="tree-title" autocomplete="off" />
+            <button type="submit" data-t="add_memory"></button>
+          </form>
+          <button id="tree-close" class="btn close" type="button" data-t="close"></button>
+        </div>
+      </div>
+      <div id="away" class="modal" hidden>
+        <div class="sheet">
+          <h2 id="away-title"></h2>
+          <ul id="away-list"></ul>
+          <button id="away-close" class="big" type="button" data-t="ok"></button>
+        </div>
+      </div>
       <div id="orders" class="modal" hidden>
         <div class="sheet">
           <h2 id="orders-title"></h2>
