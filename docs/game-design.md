@@ -130,3 +130,26 @@ XP**.
 ## Controls
 
 See the [README](../README.md#how-to-play) for keyboard and touch controls.
+
+## Farmer roles and ranks
+
+Roles unlock at Garden Heart level 3. Each player picks one role; perks apply only while that role is active,
+and the rank you earned in a role is kept if you switch away. You can change role once every 7 days.
+
+| Rank | Title (VI / EN)      | Role XP |
+| ---- | -------------------- | ------- |
+| 1    | Tập sự / Apprentice  | 0       |
+| 2    | Nông dân / Farmer    | 150     |
+| 3    | Lành nghề / Skilled  | 500     |
+| 4    | Bậc thầy / Master    | 1,200   |
+| 5    | Huyền thoại / Legend | 2,500   |
+
+| Role    | Rank 2                   | Rank 3                                  | Rank 4                    | Rank 5                                             |
+| ------- | ------------------------ | --------------------------------------- | ------------------------- | -------------------------------------------------- |
+| Grower  | Crop seeds 10% cheaper   | Watering also waters the two side tiles | +1 crop on a 3★ harvest   | Watering covers a 3×3 area                         |
+| Rancher | +1 heart per pet         | Feeder costs half                       | Eggs +1★                  | Two eggs from a chicken both partners petted today |
+| Florist | Flower seeds 20% cheaper | Flowers harvested +1★ (max 3★)          | +1 flower on a 3★ harvest | Legendary florist title                            |
+
+Role XP comes from the role's own work: watering (+1) and harvesting crops for the Grower, harvesting flowers
+(sunflower, rose) for the Florist, petting (+3) and collecting eggs for the Rancher. When both partners have
+different roles, every role-XP gain is 10% larger. Code: `src/sim/roles.ts`.

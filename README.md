@@ -161,16 +161,17 @@ vuon-chung/
 
 ## Roadmap
 
-| Wave | Focus                                                                                                                         | Status |
-| ---- | ----------------------------------------------------------------------------------------------------------------------------- | ------ |
-| 1    | Solo core: map, movement, till/plant/water/harvest, shop, bin, local save, i18n                                               | Done   |
-| 2    | Professional repo: lint, format, hooks, CI, security scanning, docs                                                           | Done   |
-| 3    | Shared world: Google sign-in, one-time invite links, Firestore transactions, live avatars                                     | Done   |
-| 4    | Time and economy: seeded rain, payout-once, daily village orders, Garden Heart levels                                         | Done   |
-| 5    | Couple layer: both-hands bonus, activity feed, while-away card, mailbox, Memory Tree                                          | Done   |
-| 6    | Animals: chickens, feeder, petting, eggs, duo order, emotes, walking together                                                 | Done   |
-| 7    | Deploy: Firebase Hosting, deploy workflow after green CI, two-account e2e in CI                                               | Done   |
-| 8+   | Roles and farmer ranks, kitchen and more animals, new zones and festivals, bond level / village / story, mini-games, PWA push | Next   |
+| Wave | Focus                                                                                                 | Status |
+| ---- | ----------------------------------------------------------------------------------------------------- | ------ |
+| 1    | Solo core: map, movement, till/plant/water/harvest, shop, bin, local save, i18n                       | Done   |
+| 2    | Professional repo: lint, format, hooks, CI, security scanning, docs                                   | Done   |
+| 3    | Shared world: Google sign-in, one-time invite links, Firestore transactions, live avatars             | Done   |
+| 4    | Time and economy: seeded rain, payout-once, daily village orders, Garden Heart levels                 | Done   |
+| 5    | Couple layer: both-hands bonus, activity feed, while-away card, mailbox, Memory Tree                  | Done   |
+| 6    | Animals: chickens, feeder, petting, eggs, duo order, emotes, walking together                         | Done   |
+| 7    | Deploy: Firebase Hosting, deploy workflow after green CI, two-account e2e in CI                       | Done   |
+| 8    | Farmer roles (Grower, Rancher, Florist) with five ranks and real perks                                | Done   |
+| 9+   | Kitchen and more animals, new zones and festivals, bond level / village / story, mini-games, PWA push | Next   |
 
 ## Development
 
