@@ -696,3 +696,30 @@ body {
   background: #d7efc6;
   cursor: default;
 }
+
+/* Kitchen */
+#kitchen-list .shop-row {
+  grid-template-columns: 36px 1fr auto;
+}
+#kitchen-list button {
+  font: 800 14px var(--font);
+  border: 2px solid var(--wood);
+  background: #ffd54a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+#kitchen-list button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 380px) {
+  #hotbar {
+    gap: 4px;
+  }
+  .slot {
+    width: 48px;
+    height: 48px;
+  }
+}

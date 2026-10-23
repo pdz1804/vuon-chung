@@ -2,7 +2,7 @@
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
 import { binValue, seedPrice, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
-import { ANIMALS } from '../sim/animals';
+import { ANIMALS, ANIMAL_IDS, type AnimalSpecies } from '../sim/animals';
 import { boardFor, doneToday, duoDelivered, duoFor, haveCount } from '../sim/orders';
 import { isUnlocked } from '../sim/progression';
 import { UNLOCKS, levelFor, levelProgress } from '../sim/progression';
@@ -14,7 +14,7 @@ export interface HudHandlers {
   onBuy(id: SpeciesId, n: number): void;
   onDeliver(idx: number): void;
   onDeliverDuo(): void;
-  onBuyAnimal(): void;
+  onBuyAnimal(species: AnimalSpecies): void;
   onEmote(e: string): void;
   onLangChange(): void;
 }
@@ -47,10 +47,31 @@ export class Hud {
       setLang(getLang() === 'vi' ? 'en' : 'vi');
       this.h.onLangChange();
     });
-    $('#act').addEventListener('pointerdown', (e) => {
+    $('#act').addEventListener('click', (e) => {
       e.preventDefault();
       this.h.onAction();
     });
+    // Swallow the tail of the tap that opened a dialog (ghost clicks on phones):
+    // a click whose press began before the dialog appeared is not aimed at it.
+    let downAt = 0;
+    document.addEventListener('pointerdown', () => (downAt = performance.now()), true);
+    document.addEventListener(
+      'click',
+      (e) => {
+        const modal = (e.target as HTMLElement | null)?.closest('.modal');
+        if (modal && downAt < Number((modal as HTMLElement).dataset.openedAt ?? 0)) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      },
+      true,
+    );
+    new MutationObserver((list) => {
+      for (const m of list) {
+        const el = m.target as HTMLElement;
+        if (!el.hidden) el.dataset.openedAt = String(performance.now());
+      }
+    }).observe(document.querySelector('#ui')!, { subtree: true, attributeFilter: ['hidden'] });
     $('#shop-close').addEventListener('click', () => this.closeShop());
     $('#orders-close').addEventListener('click', () => ($('#orders').hidden = true));
     this.bindStick();
@@ -152,7 +173,7 @@ export class Hud {
         }
         return row;
       }),
-      this.animalRow(s),
+      ...ANIMAL_IDS.map((sp) => this.animalRow(s, sp)),
     );
     $('#shop').hidden = false;
   }
@@ -166,21 +187,22 @@ export class Hud {
     $('#orders').hidden = true;
   }
 
-  private animalRow(s: FarmState) {
+  private animalRow(s: FarmState, species: AnimalSpecies) {
     const row = document.createElement('div');
     row.className = 'shop-row';
-    const spec = ANIMALS.chicken;
+    const spec = ANIMALS[species];
     const locked = !isUnlocked(spec.unlock, s.xp);
-    const owned = s.animals.length;
-    const note = locked ? t('locked_at', { n: 2 }) : `${spec.cost} ${t('coins')} · ${owned}/${spec.capacity}`;
-    row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t('chick')}<small>${note}</small></span>`;
-    drawIcon(row.querySelector('canvas')!, 'chicken_0');
+    const owned = s.animals.filter((a) => a.species === species).length;
+    const lv = Object.entries(UNLOCKS).find(([, f]) => f.includes(spec.unlock))?.[0] ?? '?';
+    const note = locked ? t('locked_at', { n: lv }) : `${spec.cost} ${t('coins')} · ${owned}/${spec.capacity}`;
+    row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t(`baby.${species}`)}<small>${note}</small></span>`;
+    drawIcon(row.querySelector('canvas')!, `${species}_0`);
     if (locked) row.classList.add('locked');
     else {
       const b = document.createElement('button');
       b.textContent = t('buy');
       b.disabled = s.coins < spec.cost || owned >= spec.capacity;
-      b.addEventListener('click', () => this.h.onBuyAnimal());
+      b.addEventListener('click', () => this.h.onBuyAnimal(species));
       row.append(b);
     }
     return row;
@@ -268,7 +290,7 @@ let iconSource: ((id: string) => HTMLCanvasElement | null) | null = null;
 export function setIconSource(fn: (id: string) => HTMLCanvasElement | null) {
   iconSource = fn;
 }
-function drawIcon(cv: HTMLCanvasElement, id: string) {
+export function drawIcon(cv: HTMLCanvasElement, id: string) {
   const src = iconSource?.(id);
   if (src) cv.getContext('2d')!.drawImage(src, 0, 0, cv.width, cv.height);
 }

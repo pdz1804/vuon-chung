@@ -5,7 +5,7 @@ import { vnDay, type ActionResult, type FarmState } from './farm';
 import { isUnlocked } from './progression';
 import { activeRank, gainRoleXp } from './roles';
 
-export type AnimalSpecies = 'chicken';
+export type AnimalSpecies = 'chicken' | 'duck' | 'cow';
 
 export interface Animal {
   id: string;
@@ -22,8 +22,11 @@ export interface Animal {
 }
 
 export const ANIMALS = {
-  chicken: { cost: 300, product: 'egg', productPrice: 30, unlock: 'chicken', capacity: 4, feedCost: 3 },
+  chicken: { cost: 300, product: 'egg', unlock: 'chicken', capacity: 4, feedCost: 3 },
+  duck: { cost: 400, product: 'duck_egg', unlock: 'duck', capacity: 4, feedCost: 4 },
+  cow: { cost: 1200, product: 'milk', unlock: 'cow', capacity: 2, feedCost: 8 },
 } as const;
+export const ANIMAL_IDS = Object.keys(ANIMALS) as AnimalSpecies[];
 
 export const MAX_HEARTS = 10;
 /** Days without food before hearts start dropping (one per extra day, never below 0). */
@@ -124,12 +127,12 @@ export function collectEgg(s: FarmState, id: string, now: number, uid = 'local')
   const stars = Math.min(3, eggStars(a, now) + (rank >= 4 ? 1 : 0)) as 1 | 2 | 3;
   // Rank 5: two eggs from a chicken both partners petted today.
   const count = rank >= 5 && new Set(a.pets[vnDay(now)] ?? []).size >= 2 ? 2 : 1;
-  const item = `egg:${stars}`;
+  const item = `${ANIMALS[a.species].product}:${stars}`;
   s.produce[item] = (s.produce[item] ?? 0) + count;
   gainRoleXp(s, uid, 'rancher', 2 * stars);
   a.collectedDay = vnDay(now);
   s.xp += 2 * stars;
-  return { ok: true, msg: 'egg_collected', vars: { stars } };
+  return { ok: true, msg: 'egg_collected', vars: { stars, species: ANIMALS[a.species].product } };
 }
 
 /** The single "use" on an animal: pet first, then collect, then show its mood. */
@@ -155,19 +158,26 @@ export function animalPosition(
   now: number,
   pen: { x0: number; y0: number; x1: number; y1: number },
 ) {
+  // Each animal owns a home cell (4 per row, so 10 animals never pile up)
+  // and wanders within a few pixels of it.
+  const cols = 4;
+  const rows = 3;
+  const cellW = (pen.x1 - pen.x0) / cols;
+  const cellH = (pen.y1 - pen.y0) / rows;
+  const home = {
+    x: pen.x0 + ((index % cols) + 0.5) * cellW,
+    y: pen.y0 + ((Math.floor(index / cols) % rows) + 0.5) * cellH,
+  };
   const step = Math.floor(now / 4000);
   const pick = (k: number, salt: string) => {
     let h = 2166136261;
     const text = `${id}:${k}:${salt}`;
     for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-    return ((h >>> 0) % 1000) / 1000;
+    return ((h >>> 0) % 1000) / 1000 - 0.5;
   };
-  const at = (k: number) => ({
-    x: pen.x0 + pick(k, 'x') * (pen.x1 - pen.x0),
-    y: pen.y0 + pick(k, 'y') * (pen.y1 - pen.y0),
-  });
-  const a = at(step + index * 7);
-  const b = at(step + 1 + index * 7);
+  const at = (k: number) => ({ x: home.x + pick(k, 'x') * cellW * 0.4, y: home.y + pick(k, 'y') * cellH * 0.4 });
+  const a = at(step);
+  const b = at(step + 1);
   const f = Math.min(1, ((now % 4000) / 4000) * 2); // walk for 2 s, rest 2 s
   return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, moving: f < 1, left: b.x < a.x };
 }

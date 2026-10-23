@@ -63,16 +63,19 @@ export function deliverDuo(s: FarmState, uid: string, now: number): ActionResult
   return { ok: true, msg: 'duo_done', vars: { value: order.coins, xp: order.xp } };
 }
 
-/** Removes `n` items of a species from the bag, lowest quality first. */
-function take(s: FarmState, species: string, n: number) {
+/** Removes `n` items of a species from the bag, lowest quality first. Returns the stars taken. */
+export function take(s: FarmState, species: string, n: number): number[] {
   let need = n;
+  const stars: number[] = [];
   for (const st of [1, 2, 3]) {
     const k = `${species}:${st}`;
     const got = Math.min(need, s.produce[k] ?? 0);
     if (got) s.produce[k] -= got;
     if (!s.produce[k]) delete s.produce[k];
+    for (let i = 0; i < got; i++) stars.push(st);
     need -= got;
   }
+  return stars;
 }
 
 /** Today's completed orders, resetting when the Vietnam day changes. */

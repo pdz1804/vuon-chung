@@ -247,6 +247,81 @@ export function buildTextures(scene: Phaser.Scene) {
       ),
     );
   }
+  make(scene, 'duck_0', (c) =>
+    art(
+      c,
+      [
+        '................',
+        '................',
+        '................',
+        '......GGGG......',
+        '......GEGGOO....',
+        '......GGGGOO....',
+        '.......WWW......',
+        '..W..WWWWWW.....',
+        '..WWWWWWWWWW....',
+        '...WWWWWWWWW....',
+        '....WWWWWWW.....',
+        '......O..O......',
+        '.....OO.OO......',
+        '................',
+        '................',
+        '................',
+      ],
+      { G: '#2f7d4f', E: '#111', O: '#f2a33a', W: '#f4f1e6' },
+    ),
+  );
+  make(scene, 'duck_1', (c) => c.drawImage(scene.textures.get('duck_0').getSourceImage() as HTMLCanvasElement, 0, 1));
+  make(scene, 'cow_0', (c) =>
+    art(
+      c,
+      [
+        '................',
+        '................',
+        '..H.........H...',
+        '..WWW......WW...',
+        '..WEWWWWWWWWWW..',
+        '..WWWWBBWWWBBW..',
+        '..PPWWBBWWWWWW..',
+        '...WWWWWWBBWWW..',
+        '...WWWWWWBBWWW..',
+        '....WWWWWWWWW...',
+        '....W.W...W.W...',
+        '....K.K...K.K...',
+        '................',
+        '................',
+        '................',
+        '................',
+      ],
+      { W: '#f6f2ea', B: '#3b2f2a', E: '#111', P: '#f2a7b0', H: '#c9b48a', K: '#4a3426' },
+      0,
+      2,
+    ),
+  );
+  make(scene, 'cow_1', (c) => c.drawImage(scene.textures.get('cow_0').getSourceImage() as HTMLCanvasElement, 0, 1));
+  make(scene, 'duck_egg_4', (c) => art(c, ['.EE.', 'EEEE', 'EEEE', 'EEEE', '.EE.'], { E: '#cfe6dd' }, 6, 6));
+  make(scene, 'milk_4', (c) => {
+    fill(c, '#e8eef2', 5, 4, 6, 10);
+    fill(c, '#5b8fd8', 5, 7, 6, 3);
+    fill(c, '#c9d3da', 6, 2, 4, 2);
+  });
+  // Dish icons: a plate with the dish's colours.
+  const dishes: Record<string, [string, string]> = {
+    rau_xao: ['#3f9a3a', '#f4d06f'],
+    mut_dau: ['#c9304a', '#e85a70'],
+    com_trung: ['#f6f2ea', '#f4c430'],
+    bo_hoa: ['#fbc02d', '#d6344f'],
+    banh_flan: ['#f4c26a', '#8a4a1a'],
+    che_bi_do: ['#f08a24', '#f6f2ea'],
+  };
+  for (const [id, [a, b]] of Object.entries(dishes)) {
+    make(scene, `${id}_4`, (c) => {
+      fill(c, '#ffffff', 2, 9, 12, 4);
+      fill(c, '#d8d2c4', 3, 12, 10, 1);
+      fill(c, a, 4, 6, 8, 4);
+      fill(c, b, 6, 5, 4, 2);
+    });
+  }
   make(scene, 'egg_4', (c) =>
     art(
       c,
@@ -351,6 +426,16 @@ function drawCrop(c: Ctx, id: string, st: number, leaf: string, fruit: string) {
       ]) {
         fill(c, fruit, x, y, 2, 2);
         fill(c, '#fff3', x, y);
+      }
+    } else if (id === 'pumpkin') {
+      fill(c, fruit, 3, 7, 10, 7);
+      fill(c, '#d9701a', 6, 7, 1, 7);
+      fill(c, '#d9701a', 9, 7, 1, 7);
+      fill(c, '#5a3a1a', 7, 5, 2, 2);
+    } else if (id === 'rice') {
+      for (const x of [3, 6, 9, 12]) {
+        fill(c, fruit, x, 2, 1, 6);
+        fill(c, '#d4b85a', x + 1, 3, 1, 3);
       }
     } else if (id === 'rose') {
       for (const [x, y] of [

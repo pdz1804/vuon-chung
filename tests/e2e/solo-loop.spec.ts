@@ -31,7 +31,7 @@ test('solo loop: till, plant, water, grow, harvest, ship', async ({ page }) => {
   const farm = () => page.evaluate(() => (window as unknown as QaWindow).__qa.farm());
   const use = async () => {
     const act = page.locator('#act');
-    if (await act.isVisible()) await act.dispatchEvent('pointerdown');
+    if (await act.isVisible()) await act.click();
     else await page.keyboard.press('Space');
   };
 
@@ -121,7 +121,10 @@ test('chickens: buy a chick, fill the feeder, pet it and collect an egg', async 
   });
   await standFacing(page, 2, 8); // coop opens the shop
   await page.keyboard.press('Space');
-  await page.locator('#shop-list .shop-row').last().locator('button').click();
+  await page
+    .locator('#shop-list .shop-row', { hasText: /Gà con|Chick/ })
+    .locator('button')
+    .click();
   await page.locator('#shop-close').click();
   type F = { animals: { id: string; hearts: number }[]; produce: Record<string, number>; feederDay: string };
   await expect.poll(() => page.evaluate(() => (window.__qa.farm() as unknown as F).animals.length)).toBe(1);
@@ -166,4 +169,29 @@ test('roles unlock at level 3 and can be picked', async ({ page }) => {
   await page.locator('#roles-list .role').first().locator('button').click();
   await expect(page.locator('#roles-list .role.mine')).toHaveCount(1);
   await expect(page.locator('#roles-btn')).toHaveAttribute('title', /Nhà nông|Grower/);
+});
+
+test('kitchen opens at level 5 from the house door and cooks a dish', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => window.__qa);
+  await page.evaluate(() => {
+    const f = window.__qa.farm() as unknown as { xp: number; produce: Record<string, number> };
+    f.xp = 1100;
+    f.produce['strawberry:2'] = 4;
+    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+  });
+  await standFacing(page, 5, 4); // house front wall
+  await page.keyboard.press('Space');
+  await expect(page.locator('#kitchen')).toBeVisible();
+  await page
+    .locator('#kitchen-list .recipe', { hasText: /Mứt dâu|Strawberry jam/ })
+    .locator('button')
+    .click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window.__qa.farm() as unknown as { produce: Record<string, number> }).produce['mut_dau:2']),
+    )
+    .toBe(1);
 });

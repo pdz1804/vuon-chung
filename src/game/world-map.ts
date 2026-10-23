@@ -64,4 +64,4 @@ export function propAt(x: number, y: number): Prop | undefined {
 export const BLOCKING: Ground[] = ['water', 'fence', 'tree'];
 export const SPAWN = { x: 15, y: 7 };
 /** Where chickens wander, in pixels (left of the field fence). */
-export const PEN = { x0: 2 * 16 + 6, y0: 10.5 * 16, x1: 6.6 * 16, y1: 15 * 16 };
+export const PEN = { x0: 1.5 * 16, y0: 10.5 * 16, x1: 7.5 * 16, y1: 16 * 16 };

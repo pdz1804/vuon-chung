@@ -18,12 +18,13 @@ import {
 } from '../sim/farm';
 import { addMemory, partnerTendedToday, readLetters, sendLetter, treeStage, unreadFor } from '../sim/couple';
 import { animalPosition, buyAnimal, fedToday, fillFeeder, useAnimal } from '../sim/animals';
+import { cook } from '../sim/kitchen';
 import { deliverDuo, fulfill } from '../sim/orders';
 import { ROLE_IDS, chooseRole, rankFor } from '../sim/roles';
 import { UNLOCKS, isUnlocked, levelFor } from '../sim/progression';
 import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
-import { Hud, setIconSource } from '../ui/hud';
+import { Hud, drawIcon, setIconSource } from '../ui/hud';
 import { Panels } from '../ui/panels';
 import { TILE, buildTextures } from './textures';
 import { BLOCKING, MAP_H, MAP_W, PEN, PROPS, SPAWN, buildGround, isFieldTile, propAt } from './world-map';
@@ -115,7 +116,7 @@ export class FarmScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     // enableCapture=false: keys must still reach the letter and memory text boxes.
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE,FOUR', false) as Record<
+    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE,FOUR,FIVE,SIX', false) as Record<
       string,
       Phaser.Input.Keyboard.Key
     >;
@@ -129,7 +130,7 @@ export class FarmScene extends Phaser.Scene {
       this.hud.closeModals();
       this.panels.close();
     });
-    (['ONE', 'TWO', 'THREE', 'FOUR'] as const).forEach((k, i) =>
+    (['ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'] as const).forEach((k, i) =>
       kb.on(`keydown-${k}`, () => !this.typing() && !this.hud.modalOpen && this.selectSeed(SPECIES_IDS[i])),
     );
 
@@ -137,6 +138,7 @@ export class FarmScene extends Phaser.Scene {
       sendLetter: async (text) => (await this.run((s, ts, uid) => sendLetter(s, uid, text, ts)))?.ok ?? false,
       readLetters: () => void this.store.apply((s, _, uid) => readLetters(s, uid)).catch(console.error),
       chooseRole: (role) => void this.run((s, ts, uid) => chooseRole(s, uid, role, ts)),
+      cook: (id) => void this.run((s) => cook(s, id)),
       addMemory: async (date, title) =>
         (await this.run((s, ts, uid) => addMemory(s, uid, date, title, ts)))?.ok ?? false,
     });
@@ -146,8 +148,8 @@ export class FarmScene extends Phaser.Scene {
       onBuy: (id, n) => void this.run((s, _, uid) => buySeeds(s, id, n, uid)),
       onDeliver: (i) => void this.run((s, ts) => fulfill(s, i, ts)),
       onDeliverDuo: () => void this.run((s, ts, uid) => deliverDuo(s, uid, ts)),
-      onBuyAnimal: () =>
-        void this.run((s, ts) => buyAnimal(s, 'chicken', CHICK_NAMES[s.animals.length % CHICK_NAMES.length], ts)),
+      onBuyAnimal: (species) =>
+        void this.run((s, ts) => buyAnimal(s, species, CHICK_NAMES[s.animals.length % CHICK_NAMES.length], ts)),
       onEmote: (e) => this.emote(e),
       onLangChange: () => this.refresh(),
     });
@@ -295,7 +297,7 @@ export class FarmScene extends Phaser.Scene {
         this.animalSprites.get(a.id) ?? this.animalSprites.set(a.id, this.add.image(0, 0, 'chicken_0')).get(a.id)!;
       s.setPosition(pos.x, pos.y)
         .setFlipX(pos.left)
-        .setTexture(`chicken_${pos.moving ? Math.floor(this.time.now / 180) % 2 : 0}`)
+        .setTexture(`${a.species}_${pos.moving ? Math.floor(this.time.now / 180) % 2 : 0}`)
         .setDepth(pos.y + 4);
     });
   }
@@ -403,14 +405,22 @@ export class FarmScene extends Phaser.Scene {
     // Animals first: they stand on tiles that are otherwise free.
     const cx = x * TILE + 8;
     const cy = y * TILE + 8;
+    // The nearest animal to the targeted tile, if any is close enough.
+    let best: { id: string; d: number } | null = null;
     for (const a of this.store.farm.animals) {
       const s = this.animalSprites.get(a.id);
-      if (s && Math.hypot(s.x - cx, s.y - cy) < 14) {
-        const id = a.id;
-        return this.run((st, ts, uid) => useAnimal(st, id, uid, ts));
-      }
+      const d = s ? Math.hypot(s.x - cx, s.y - cy) : Infinity;
+      if (d < 14 && (!best || d < best.d)) best = { id: a.id, d };
+    }
+    if (best) {
+      const id = best.id;
+      return this.run((st, ts, uid) => useAnimal(st, id, uid, ts));
     }
     const prop = propAt(x, y);
+    if (prop?.id === 'house') {
+      if (!isUnlocked('kitchen', this.store.farm.xp)) return this.hud.toast(t('locked_kitchen'));
+      return this.panels.openKitchen(this.store.farm, drawIcon);
+    }
     if (prop?.id === 'feeder') return this.run((s, ts, uid) => fillFeeder(s, ts, uid));
     if (prop?.id === 'coop') return this.hud.openShop(this.store.farm, this.store.uid);
     if (prop?.id === 'bin') return this.run((s, ts) => ship(s, ts));
@@ -468,6 +478,7 @@ export class FarmScene extends Phaser.Scene {
     if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now(), this.duoContext());
     if (this.panels.mailOpen) this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (this.panels.treeOpen) this.panels.openTree(this.store.farm, this.names());
+    if (this.panels.kitchenOpen) this.panels.openKitchen(this.store.farm, drawIcon);
     this.syncRoles();
     this.feederImg.setTexture(fedToday(this.store.farm, now()) ? 'feeder_full' : 'feeder');
     this.hud.showEmotes(this.store.members.length >= 2);

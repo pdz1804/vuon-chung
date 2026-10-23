@@ -4,6 +4,9 @@ import { t } from '../i18n';
 import { LETTER_MAX, MEMORY_TITLE_MAX, awaySummary, type Letter } from '../sim/couple';
 import { now } from '../clock';
 import { vnDay, type FarmState } from '../sim/farm';
+import { RECIPES, canCook } from '../sim/kitchen';
+import { haveCount } from '../sim/orders';
+import { sellPrice } from '../sim/species';
 import { ROLE_IDS, hasSynergy, rankFor, rankProgress, titleKey, type RoleId } from '../sim/roles';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
@@ -14,6 +17,7 @@ export interface PanelHandlers {
   readLetters(): void;
   addMemory(date: string, title: string): Promise<boolean>;
   chooseRole(role: RoleId): void;
+  cook(recipeId: string): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -34,7 +38,7 @@ function when(ts: number) {
 
 export class Panels {
   constructor(private h: PanelHandlers) {
-    for (const id of ['mail', 'tree', 'away', 'roles']) {
+    for (const id of ['mail', 'tree', 'away', 'roles', 'kitchen']) {
       $(`#${id}-close`).addEventListener('click', () => ($(`#${id}`).hidden = true));
     }
     $('#mail-form').addEventListener('submit', (e) => {
@@ -64,6 +68,34 @@ export class Panels {
 
   get rolesOpen() {
     return !$('#roles').hidden;
+  }
+
+  get kitchenOpen() {
+    return !$('#kitchen').hidden;
+  }
+
+  /** Recipes with what you have of each ingredient and a Cook button. */
+  openKitchen(s: FarmState, icon: (cv: HTMLCanvasElement, id: string) => void) {
+    this.labels();
+    $('#kitchen-list').replaceChildren(
+      ...RECIPES.map((r) => {
+        const row = el('div', 'shop-row recipe');
+        const cv = el('canvas');
+        cv.width = cv.height = 16;
+        icon(cv, r.id);
+        const name = el('span', 'nm', `${t(`sp.${r.id}`)}`);
+        const need = Object.entries(r.inputs)
+          .map(([item, n]) => `${t(`sp.${item}`)} ${Math.min(haveCount(s, item), n)}/${n}`)
+          .join(' · ');
+        name.append(el('small', '', `${need} · ${sellPrice(r.id, 1)} ${t('coins')}`));
+        const b = el('button', '', t('cook'));
+        b.disabled = !canCook(s, r);
+        b.addEventListener('click', () => this.h.cook(r.id));
+        row.append(cv, name, b);
+        return row;
+      }),
+    );
+    $('#kitchen').hidden = false;
   }
 
   /** Role cards: what each role is good at, your rank, perks by rank, and who has it. */
@@ -102,12 +134,12 @@ export class Panels {
   }
 
   close() {
-    for (const id of ['mail', 'tree', 'away', 'roles']) $(`#${id}`).hidden = true;
+    for (const id of ['mail', 'tree', 'away', 'roles', 'kitchen']) $(`#${id}`).hidden = true;
   }
 
   private labels() {
     for (const e of document.querySelectorAll<HTMLElement>(
-      '#mail [data-t], #tree [data-t], #away [data-t], #roles [data-t]',
+      '#mail [data-t], #tree [data-t], #away [data-t], #roles [data-t], #kitchen [data-t]',
     )) {
       e.textContent = t(e.dataset.t!);
     }

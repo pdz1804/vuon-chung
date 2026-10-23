@@ -1,6 +1,6 @@
 import { HOUR } from './growth';
 
-export type SpeciesId = 'rau_muong' | 'strawberry' | 'sunflower' | 'rose';
+export type SpeciesId = 'rau_muong' | 'strawberry' | 'sunflower' | 'rose' | 'pumpkin' | 'rice';
 
 export interface Species {
   id: SpeciesId;
@@ -63,12 +63,43 @@ export const SPECIES: Record<SpeciesId, Species> = {
     unlock: 'rose',
     color: { leaf: '#3d8b3a', fruit: '#d6344f' },
   },
+  pumpkin: {
+    id: 'pumpkin',
+    seedCost: 40,
+    growMs: 72 * HOUR,
+    yield: 1,
+    sellPrice: 140,
+    xp: 12,
+    unlock: 'pumpkin',
+    color: { leaf: '#5a9a3a', fruit: '#f08a24' },
+  },
+  rice: {
+    id: 'rice',
+    seedCost: 10,
+    growMs: 24 * HOUR,
+    yield: 2,
+    sellPrice: 15,
+    xp: 4,
+    unlock: 'rice',
+    color: { leaf: '#7cb342', fruit: '#e8d27a' },
+  },
 };
 
 export const SPECIES_IDS = Object.keys(SPECIES) as SpeciesId[];
 
 /** Sellable things that aren't crops (animal products). */
-export const PRODUCTS: Record<string, number> = { egg: 30 };
+export const PRODUCTS: Record<string, number> = {
+  egg: 30,
+  duck_egg: 45,
+  milk: 90,
+  // Kitchen dishes (see kitchen.ts).
+  rau_xao: 75,
+  mut_dau: 70,
+  bo_hoa: 260,
+  com_trung: 90,
+  banh_flan: 230,
+  che_bi_do: 300,
+};
 
 export function sellPrice(id: string, stars: number): number {
   const base = (SPECIES as Record<string, Species | undefined>)[id]?.sellPrice ?? PRODUCTS[id] ?? 0;

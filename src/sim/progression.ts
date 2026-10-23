@@ -22,6 +22,9 @@ export function levelProgress(xp: number): number {
 export const UNLOCKS: Record<number, string[]> = {
   2: ['orders', 'chicken'],
   3: ['rose', 'roles'],
+  4: ['duck', 'pumpkin'],
+  5: ['kitchen', 'rice'],
+  6: ['cow'],
 };
 
 export function isUnlocked(feature: string, xp: number): boolean {
