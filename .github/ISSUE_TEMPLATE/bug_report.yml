@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the game or tooling does not work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the game
+        2. Till a tile ...
+    validations:
+      required: true
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options: [Desktop, Phone or tablet]
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 130, Safari 18 ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or screenshots
+      description: Do not paste secrets or personal data.
