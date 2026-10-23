@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#2f7d4f" />
+    <meta name="description" content="Vườn Chung — a cozy two-player garden you grow together." />
+    <title>Vườn Chung</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="ui">
+      <header id="status">
+        <span id="coins" class="pill"></span>
+        <span id="xp" class="pill"></span>
+        <span id="clock" class="pill"></span>
+        <span id="binval" class="pill muted-pill"></span>
+        <button id="lang" class="pill btn" type="button" aria-label="Language"></button>
+      </header>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <footer id="bottom">
+        <div id="bag"></div>
+        <div id="hotbar"></div>
+        <p id="help"></p>
+      </footer>
+      <div id="stick" aria-hidden="true"><div id="knob"></div></div>
+      <button id="act" type="button"></button>
+      <div id="shop" class="modal" hidden>
+        <div class="sheet">
+          <h2 id="shop-title"></h2>
+          <div id="shop-list"></div>
+          <button id="shop-close" class="btn" type="button"></button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
