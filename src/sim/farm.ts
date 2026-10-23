@@ -1,9 +1,11 @@
 // Farm state and the actions players take on it. Pure: every action receives `now`,
 // so the same code can later run against the shared Firestore world.
-import { WATER_MS, isHydrated, progress, qualityStars, stage, type CropTimes } from './growth';
+import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type CropTimes } from './growth';
+import { isUnlocked } from './progression';
 import { SPECIES, sellPrice, type SpeciesId } from './species';
+import { rainWaterings } from './weather';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 const VN_OFFSET_MS = 7 * 3_600_000;
 
 export interface Crop extends CropTimes {
@@ -28,6 +30,9 @@ export interface FarmState {
   /** Items in the shipping bin, paid out at the next Vietnam midnight. */
   bin: Record<string, number>;
   binDay: string | null;
+  /** Village orders completed today (indices into ordersFor(day)). */
+  /** `xp` freezes which crops today's board may ask for, so it can't reshuffle mid-day. */
+  orders: { day: string; done: number[]; xp?: number };
 }
 
 export type ActionResult =
@@ -44,6 +49,7 @@ export function newFarm(): FarmState {
     produce: {},
     bin: {},
     binDay: null,
+    orders: { day: '', done: [] },
   };
 }
 
@@ -59,8 +65,17 @@ function growMsFor(crop: Crop): number {
   return crop.harvests > 0 && sp.regrowMs ? sp.regrowMs : sp.growMs;
 }
 
+/** The crop's watering history including the mornings it rained. */
+export function withRain(crop: Crop, now: number): CropTimes {
+  return { plantedAt: crop.plantedAt, waterings: [...crop.waterings, ...rainWaterings(crop.plantedAt, now)] };
+}
+
 export function cropStage(crop: Crop, now: number) {
-  return stage(crop, growMsFor(crop), now);
+  return stage(withRain(crop, now), growMsFor(crop), now);
+}
+
+export function cropWilted(crop: Crop, now: number) {
+  return cropStage(crop, now) < 4 && isWilted(withRain(crop, now), now);
 }
 
 export type TileState = 'empty' | 'needs_water' | 'growing' | 'ready';
@@ -68,7 +83,7 @@ export type TileState = 'empty' | 'needs_water' | 'growing' | 'ready';
 export function plotState(plot: Plot, now: number): TileState {
   if (!plot.crop) return 'empty';
   if (cropStage(plot.crop, now) === 4) return 'ready';
-  return isHydrated(plot.crop, now) ? 'growing' : 'needs_water';
+  return isHydrated(withRain(plot.crop, now), now) ? 'growing' : 'needs_water';
 }
 
 export function till(s: FarmState, x: number, y: number): ActionResult {
@@ -91,7 +106,7 @@ export function plant(s: FarmState, x: number, y: number, species: SpeciesId, no
 export function water(s: FarmState, x: number, y: number, now: number): ActionResult {
   const crop = s.plots[key(x, y)]?.crop;
   if (!crop) return { ok: false, msg: 'nothing_to_water' };
-  if (isHydrated(crop, now)) return { ok: false, msg: 'already_wet' };
+  if (isHydrated(withRain(crop, now), now)) return { ok: false, msg: 'already_wet' };
   crop.waterings.push(now);
   return { ok: true, msg: 'watered' };
 }
@@ -102,15 +117,16 @@ export function harvest(s: FarmState, x: number, y: number, now: number): Action
   if (!plot || !crop) return { ok: false, msg: 'nothing_here' };
   if (cropStage(crop, now) !== 4) return { ok: false, msg: 'not_ready' };
   const sp = SPECIES[crop.species];
-  const stars = qualityStars(crop, growMsFor(crop), now);
+  const stars = qualityStars(withRain(crop, now), growMsFor(crop), now);
   const item = `${crop.species}:${stars}`;
   s.produce[item] = (s.produce[item] ?? 0) + sp.yield;
   s.xp += sp.xp * stars;
   if (sp.regrowMs) {
-    // Regrowing plant: restart its clock, keep any watering still in effect.
+    // Regrowing plant: restart its clock, keep any watering (or rain) still in effect.
+    const wet = withRain(crop, now).waterings.filter((w) => w <= now && now < w + WATER_MS);
     crop.harvests += 1;
     crop.plantedAt = now;
-    crop.waterings = crop.waterings.filter((w) => w <= now && now < w + WATER_MS);
+    crop.waterings = wet;
   } else {
     delete plot.crop;
   }
@@ -149,6 +165,7 @@ export function payout(s: FarmState, now: number): number {
 }
 
 export function buySeeds(s: FarmState, species: SpeciesId, count = 1): ActionResult {
+  if (!speciesUnlocked(species, s.xp)) return { ok: false, msg: 'locked', vars: { species } };
   const cost = SPECIES[species].seedCost * count;
   if (s.coins < cost) return { ok: false, msg: 'not_enough_coins' };
   s.coins -= cost;
@@ -156,11 +173,27 @@ export function buySeeds(s: FarmState, species: SpeciesId, count = 1): ActionRes
   return { ok: true, msg: 'bought', vars: { species, n: count } };
 }
 
-/** Upgrades an older save to the current schema. */
+export function speciesUnlocked(id: SpeciesId, xp: number): boolean {
+  const unlock = SPECIES[id].unlock;
+  return !unlock || isUnlocked(unlock, xp);
+}
+
+/**
+ * Upgrades an older save to the current schema. New fields get their defaults
+ * (v1 → v2 adds `orders`). A save from a NEWER app version is kept as-is (see
+ * isFromNewerApp) so this client never overwrites it with a downgraded copy;
+ * only unrecognisable data starts a fresh farm.
+ */
 export function migrate(raw: unknown): FarmState {
   const s = raw as Partial<FarmState> | null;
-  if (!s || typeof s !== 'object' || s.schemaVersion !== SCHEMA_VERSION) return newFarm();
-  return { ...newFarm(), ...s };
+  const v = s && typeof s === 'object' ? s.schemaVersion : undefined;
+  if (typeof v !== 'number' || v < 1) return newFarm();
+  return { ...newFarm(), ...s, schemaVersion: Math.max(v, SCHEMA_VERSION) };
+}
+
+/** True when the farm was written by a newer app: this client must not write it. */
+export function isFromNewerApp(s: FarmState): boolean {
+  return s.schemaVersion > SCHEMA_VERSION;
 }
 
 /**
@@ -179,6 +212,6 @@ export function useTile(s: FarmState, x: number, y: number, selected: SpeciesId,
   return {
     ok: false,
     msg: 'growing',
-    vars: { species: crop.species, pct: Math.floor(progress(crop, growMsFor(crop), now) * 100) },
+    vars: { species: crop.species, pct: Math.floor(progress(withRain(crop, now), growMsFor(crop), now) * 100) },
   };
 }

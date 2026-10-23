@@ -1,6 +1,6 @@
 import { HOUR } from './growth';
 
-export type SpeciesId = 'rau_muong' | 'strawberry' | 'sunflower';
+export type SpeciesId = 'rau_muong' | 'strawberry' | 'sunflower' | 'rose';
 
 export interface Species {
   id: SpeciesId;
@@ -14,6 +14,8 @@ export interface Species {
   /** Sell price of a 1-star item; 2★ = ×1.25, 3★ = ×1.5. */
   sellPrice: number;
   xp: number;
+  /** Feature key from progression.UNLOCKS; absent = available from the start. */
+  unlock?: string;
   /** Pixel colours used by the procedural sprite. */
   color: { leaf: string; fruit: string };
 }
@@ -46,6 +48,16 @@ export const SPECIES: Record<SpeciesId, Species> = {
     sellPrice: 45,
     xp: 5,
     color: { leaf: '#558b2f', fruit: '#fbc02d' },
+  },
+  rose: {
+    id: 'rose',
+    seedCost: 30,
+    growMs: 48 * HOUR,
+    yield: 1,
+    sellPrice: 80,
+    xp: 8,
+    unlock: 'rose',
+    color: { leaf: '#3d8b3a', fruit: '#d6344f' },
   },
 };
 

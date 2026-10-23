@@ -5,8 +5,20 @@ import { now, vnHour } from '../clock';
 import { t } from '../i18n';
 import type { Pose, Presence } from '../net/presence';
 import type { Look, WorldStore } from '../net/world-store';
-import { isWilted } from '../sim/growth';
-import { buySeeds, cropStage, payout, plotState, ship, useTile, vnDay, type ActionResult } from '../sim/farm';
+import {
+  buySeeds,
+  cropStage,
+  cropWilted,
+  payout,
+  plotState,
+  ship,
+  useTile,
+  vnDay,
+  type ActionResult,
+} from '../sim/farm';
+import { fulfill } from '../sim/orders';
+import { UNLOCKS, isUnlocked, levelFor } from '../sim/progression';
+import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, setIconSource } from '../ui/hud';
 import { TILE, buildTextures } from './textures';
@@ -51,6 +63,9 @@ export class FarmScene extends Phaser.Scene {
   private keys!: Record<string, Phaser.Input.Keyboard.Key>;
   private lastClock = '';
   private lastPayoutTry = 0;
+  private level = 0;
+  private rain?: Phaser.GameObjects.Particles.ParticleEmitter;
+  private wasRaining = false;
   private busy = false;
   private presence?: Presence;
 
@@ -76,14 +91,14 @@ export class FarmScene extends Phaser.Scene {
     this.fitZoom();
 
     const kb = this.input.keyboard!;
-    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE') as Record<
+    this.keys = kb.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,SPACE,E,ONE,TWO,THREE,FOUR') as Record<
       string,
       Phaser.Input.Keyboard.Key
     >;
     kb.on('keydown-SPACE', () => void this.act());
     kb.on('keydown-E', () => void this.act());
-    kb.on('keydown-ESC', () => this.hud.closeShop());
-    (['ONE', 'TWO', 'THREE'] as const).forEach((k, i) =>
+    kb.on('keydown-ESC', () => this.hud.closeModals());
+    (['ONE', 'TWO', 'THREE', 'FOUR'] as const).forEach((k, i) =>
       kb.on(`keydown-${k}`, () => !this.hud.shopOpen && this.selectSeed(SPECIES_IDS[i])),
     );
 
@@ -91,6 +106,7 @@ export class FarmScene extends Phaser.Scene {
       onSelectSeed: (id) => this.selectSeed(id),
       onAction: () => void this.act(),
       onBuy: (id, n) => void this.run((s) => buySeeds(s, id, n)),
+      onDeliver: (i) => void this.run((s, ts) => fulfill(s, i, ts)),
       onLangChange: () => this.refresh(),
     });
 
@@ -141,6 +157,21 @@ export class FarmScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
     this.physics.add.collider(this.player, walls);
 
+    // Rain falls across the camera view, not the whole map.
+    this.rain = this.add
+      .particles(0, 0, 'raindrop', {
+        x: { min: 0, max: 1 }, // widened to the view in fitZoom()
+        y: -8,
+        speedY: { min: 160, max: 220 },
+        speedX: -20,
+        lifespan: 2200,
+        quantity: 4,
+        frequency: 30,
+        alpha: { start: 0.8, end: 0.3 },
+        emitting: false,
+      })
+      .setDepth(9600)
+      .setScrollFactor(0);
     this.cursor = this.add.rectangle(0, 0, TILE, TILE).setStrokeStyle(1, 0xffffff, 0.9).setDepth(9000);
     this.night = this.add
       .rectangle(0, 0, MAP_W * TILE, MAP_H * TILE, 0x1a2350, 0)
@@ -153,6 +184,8 @@ export class FarmScene extends Phaser.Scene {
     // Integer zoom keeps pixels crisp; aim for ~14 tiles across on phones.
     const zoom = Math.max(2, Math.floor(Math.min(width / (14 * TILE), height / (10 * TILE))));
     this.cameras.main.setZoom(zoom);
+    // Rain is pinned to the screen; cover exactly the visible width.
+    this.rain?.updateConfig({ x: { min: -20, max: width / zoom + 20 } });
   }
 
   update(_: number, dtMs: number) {
@@ -243,6 +276,10 @@ export class FarmScene extends Phaser.Scene {
     if (prop?.id === 'bin') return this.run((s, ts) => ship(s, ts));
     if (prop?.id === 'stall') return this.hud.openShop(this.store.farm);
     if (prop?.id === 'sapling') return this.hud.toast(t('tree'));
+    if (prop?.id === 'board') {
+      if (!isUnlocked('orders', this.store.farm.xp)) return this.hud.toast(t('locked_orders'));
+      return this.hud.openOrders(this.store.farm, now());
+    }
     if (!isFieldTile(x, y)) return this.hud.toast(t('cant_farm'));
     const selected = this.selected;
     return this.run((s, ts) => useTile(s, x, y, selected, ts));
@@ -270,9 +307,20 @@ export class FarmScene extends Phaser.Scene {
   }
 
   private refresh() {
+    // Level-ups can come from either partner, so detect them on every refresh.
+    const lv = levelFor(this.store.farm.xp);
+    if (this.level && lv > this.level) {
+      // Name every unlock passed on the way (a delivery can jump several levels).
+      const unlocks: string[] = [];
+      for (let l = this.level + 1; l <= lv; l++) unlocks.push(...(UNLOCKS[l] ?? []).map((u) => t(`unlock.${u}`)));
+      this.hud.toast(t('level_up', { n: lv }) + (unlocks.length ? ` · ${unlocks.join(' · ')}` : ''));
+      this.cameras.main.flash(400, 255, 230, 160);
+    }
+    this.level = lv;
     this.drawField();
     this.hud.render(this.store.farm, this.selected);
     if (this.hud.shopOpen) this.hud.openShop(this.store.farm);
+    if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now());
     this.tick();
   }
 
@@ -306,7 +354,14 @@ export class FarmScene extends Phaser.Scene {
     const dark = h >= 19 || h < 5 ? 1 : h >= 17 ? (h - 17) / 2 : h < 7 ? (7 - h) / 2 : 0;
     this.night.setAlpha(dark * 0.45);
     const clock = `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
-    if (clock !== this.lastClock) this.hud.setClock((this.lastClock = clock));
+    const raining = rainingAt(ts);
+    if (clock !== this.lastClock || raining !== this.wasRaining) this.hud.setClock((this.lastClock = clock), raining);
+    if (raining !== this.wasRaining) {
+      this.wasRaining = raining;
+      if (raining) this.hud.toast(t('raining'));
+    }
+    this.rain?.setVisible(raining);
+    this.rain?.[raining ? 'start' : 'stop']();
   }
 
   /** Syncs soil and crop images with the farm state. */
@@ -331,7 +386,7 @@ export class FarmScene extends Phaser.Scene {
       const tex = `${plot.crop.species}_${stage}`;
       const img = existing ?? this.crops.set(k, this.add.image(px, py - 2, tex).setDepth(py)).get(k)!;
       img.setTexture(tex);
-      if (stage < 4 && isWilted(plot.crop, ts)) img.setTint(0xc2a66a).setAngle(8);
+      if (cropWilted(plot.crop, ts)) img.setTint(0xc2a66a).setAngle(8);
       else img.clearTint().setAngle(0);
     }
   }

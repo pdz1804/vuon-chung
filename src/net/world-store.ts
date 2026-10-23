@@ -15,7 +15,7 @@ import {
 } from 'firebase/firestore';
 import { now as clockNow, setClockOffset } from '../clock';
 import { loadFarm, saveFarm } from '../save';
-import { migrate, newFarm, type ActionResult, type FarmState } from '../sim/farm';
+import { isFromNewerApp, migrate, newFarm, type ActionResult, type FarmState } from '../sim/farm';
 import { db } from './firebase';
 
 export type Look = 'phu' | 'su';
@@ -112,7 +112,9 @@ export class SharedStore implements WorldStore {
     const ref = doc(db, 'worlds', this.worldId);
     return runTransaction(db, async (tx) => {
       const snap = await tx.get(ref);
-      const farm = migrate(snap.data()?.farm);
+      const farm = migrate((snap.data() as WorldDoc | undefined)?.farm);
+      // Never write a farm saved by a newer version of the game: reload instead.
+      if (isFromNewerApp(farm)) return { ok: false, msg: 'update_app' };
       const r = action(farm, clockNow());
       if (r.ok) tx.update(ref, { farm, updatedAt: serverTimestamp() });
       return r;

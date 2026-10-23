@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { HOUR, dryForMs, hydratedMs, isWilted, qualityStars, stage } from './growth';
 import { buySeeds, harvest, newFarm, payout, plant, plotState, ship, till, useTile, vnDay, water } from './farm';
 
-const T0 = Date.UTC(2026, 9, 23, 1, 0); // 08:00 in Vietnam
+// 08:00 in Vietnam on a dry day (weather is seeded from the date).
+const T0 = Date.UTC(2026, 9, 20, 1, 0);
 
 describe('growth', () => {
   it('grows only while hydrated', () => {

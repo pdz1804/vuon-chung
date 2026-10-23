@@ -1,13 +1,16 @@
 // DOM overlay: status bar, seed hotbar, bag, toasts, shop, and touch controls.
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
-import { binValue, type FarmState } from '../sim/farm';
+import { binValue, speciesUnlocked, type FarmState } from '../sim/farm';
+import { boardFor, doneToday, haveCount } from '../sim/orders';
+import { UNLOCKS, levelFor, levelProgress } from '../sim/progression';
 import { SPECIES, SPECIES_IDS, type SpeciesId } from '../sim/species';
 
 export interface HudHandlers {
   onSelectSeed(id: SpeciesId): void;
   onAction(): void;
   onBuy(id: SpeciesId, n: number): void;
+  onDeliver(idx: number): void;
   onLangChange(): void;
 }
 
@@ -22,6 +25,7 @@ export class Hud {
     onSelectSeed: () => {},
     onAction: () => {},
     onBuy: () => {},
+    onDeliver: () => {},
     onLangChange: () => {},
   };
 
@@ -40,6 +44,7 @@ export class Hud {
       this.h.onAction();
     });
     $('#shop-close').addEventListener('click', () => this.closeShop());
+    $('#orders-close').addEventListener('click', () => ($('#orders').hidden = true));
     this.bindStick();
   }
 
@@ -47,19 +52,25 @@ export class Hud {
     return !$('#shop').hidden;
   }
 
+  get ordersOpen() {
+    return !$('#orders').hidden;
+  }
+
   /** True while any dialog covers the game, so the farmer stands still. */
   get modalOpen() {
     return !!document.querySelector('.modal:not([hidden])');
   }
 
-  setClock(clock: string) {
-    $('#clock').textContent = clock;
+  setClock(clock: string, raining: boolean) {
+    $('#clock').textContent = `${clock} ${raining ? '🌧️' : ''}`.trim();
   }
 
   /** Rebuilds the HUD; call after a state change, not every frame. */
   render(s: FarmState, selected: SpeciesId) {
     $('#coins').textContent = `${s.coins} ${t('coins')}`;
-    $('#xp').textContent = `XP ${s.xp}`;
+    const lv = levelFor(s.xp);
+    $('#xp').innerHTML = `♥ ${t('level', { n: lv })}<i style="--p:${Math.round(levelProgress(s.xp) * 100)}%"></i>`;
+    $('#xp').title = `XP ${s.xp}`;
     $('#lang').textContent = getLang() === 'vi' ? 'EN' : 'VI';
     $('#act').textContent = t('action');
     $('#help').textContent = t('help');
@@ -70,7 +81,8 @@ export class Hud {
     bar.replaceChildren(
       ...SPECIES_IDS.map((id, i) => {
         const b = document.createElement('button');
-        b.className = 'slot' + (id === selected ? ' on' : '');
+        const locked = !speciesUnlocked(id, s.xp);
+        b.className = 'slot' + (id === selected ? ' on' : '') + (locked ? ' locked' : '');
         b.innerHTML = `<span class="k">${i + 1}</span><canvas width="16" height="16"></canvas><span class="c">${s.seeds[id] ?? 0}</span>`;
         b.title = t(`sp.${id}`);
         b.setAttribute('aria-label', `${t(`sp.${id}`)} ×${s.seeds[id] ?? 0}`);
@@ -109,9 +121,13 @@ export class Hud {
         const row = document.createElement('div');
         row.className = 'shop-row';
         const sp = SPECIES[id];
-        row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t(`sp.${id}`)}<small>${sp.seedCost} ${t('coins')}</small></span>`;
+        const locked = !speciesUnlocked(id, s.xp);
+        const unlockLv = Object.entries(UNLOCKS).find(([, f]) => sp.unlock && f.includes(sp.unlock))?.[0];
+        const price = locked ? t('locked_at', { n: unlockLv ?? '?' }) : `${sp.seedCost} ${t('coins')}`;
+        row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t(`sp.${id}`)}<small>${price}</small></span>`;
         drawIcon(row.querySelector('canvas')!, id);
-        for (const n of [1, 5]) {
+        if (locked) row.classList.add('locked');
+        for (const n of locked ? [] : [1, 5]) {
           const b = document.createElement('button');
           b.textContent = `${t('buy')} ×${n}`;
           b.disabled = s.coins < sp.seedCost * n;
@@ -126,6 +142,34 @@ export class Hud {
 
   closeShop() {
     $('#shop').hidden = true;
+  }
+
+  closeModals() {
+    $('#shop').hidden = true;
+    $('#orders').hidden = true;
+  }
+
+  /** The village board: today's three orders with a Deliver button each. */
+  openOrders(s: FarmState, now: number) {
+    $('#orders-title').textContent = t('orders_title');
+    $('#orders-close').textContent = t('close');
+    const done = doneToday(s, now);
+    $('#orders-list').replaceChildren(
+      ...boardFor(s, now).map((o, i) => {
+        const row = document.createElement('div');
+        row.className = 'shop-row';
+        const have = Math.min(haveCount(s, o.species), o.count);
+        row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t(`sp.${o.species}`)} ×${o.count}<small>${have}/${o.count} · +${o.coins} ${t('coins')} · +${o.xp} XP</small></span>`;
+        drawIcon(row.querySelector('canvas')!, o.species);
+        const b = document.createElement('button');
+        b.textContent = done.includes(i) ? '✓' : t('deliver');
+        b.disabled = done.includes(i) || have < o.count;
+        b.addEventListener('click', () => this.h.onDeliver(i));
+        row.append(b);
+        return row;
+      }),
+    );
+    $('#orders').hidden = false;
   }
 
   private bindStick() {

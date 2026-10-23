@@ -71,3 +71,27 @@ test('language toggle switches HUD text', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.lang)).toBe('en');
   await expect(page).toHaveTitle('Vườn Chung');
 });
+
+test('order board unlocks at level 2 and pays for a delivery', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => window.__qa);
+  await standFacing(page, 21, 4); // order board
+  await page.keyboard.press('Space');
+  await expect(page.locator('#toast')).toContainText(/cấp 2|level 2/i);
+
+  // Reach level 2 and stock the bag with plenty of every crop.
+  await page.evaluate(() => {
+    const f = window.__qa.farm() as unknown as { xp: number; produce: Record<string, number> };
+    f.xp = 100;
+    for (const s of ['rau_muong', 'strawberry', 'sunflower']) f.produce[`${s}:1`] = 10;
+    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+  });
+  await page.keyboard.press('Space');
+  await expect(page.locator('#orders')).toBeVisible();
+  const coins = await page.evaluate(() => (window.__qa.farm() as unknown as { coins: number }).coins);
+  await page.locator('#orders-list button').first().click();
+  await expect(page.locator('#orders-list button').first()).toHaveText('✓');
+  expect(await page.evaluate(() => (window.__qa.farm() as unknown as { coins: number }).coins)).toBeGreaterThan(coins);
+});

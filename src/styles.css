@@ -445,3 +445,38 @@ body {
 .modal {
   z-index: 10;
 }
+
+/* Level pill with a progress bar, locked items, order rows */
+#xp {
+  position: relative;
+  overflow: hidden;
+}
+#xp i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: var(--p, 0%);
+  background: var(--bloom);
+}
+.slot.locked,
+.shop-row.locked {
+  opacity: 0.45;
+  filter: grayscale(0.7);
+}
+#orders-list {
+  display: grid;
+  gap: 8px;
+}
+#orders .shop-row {
+  grid-template-columns: 36px 1fr auto;
+}
+#orders-close {
+  font: 800 14px var(--font);
+  border: 2px solid var(--wood);
+  background: var(--paper);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  justify-self: end;
+}

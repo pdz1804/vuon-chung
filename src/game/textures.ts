@@ -166,6 +166,17 @@ export function buildTextures(scene: Phaser.Scene) {
     32,
     32,
   );
+  make(scene, 'board', (c) => {
+    fill(c, '#7a5232', 3, 9, 2, 7);
+    fill(c, '#7a5232', 11, 9, 2, 7);
+    fill(c, '#b98a5a', 1, 2, 14, 9);
+    fill(c, '#7a5232', 1, 2, 14, 1);
+    fill(c, '#fdf8ec', 3, 4, 4, 5);
+    fill(c, '#fdf8ec', 9, 4, 4, 4);
+    fill(c, '#d94a4a', 4, 4, 2, 1);
+    fill(c, '#d94a4a', 10, 4, 2, 1);
+  });
+  make(scene, 'raindrop', (c) => fill(c, '#cfe8ff', 0, 0, 1, 3), 1, 3);
   make(scene, 'sapling', (c) =>
     art(
       c,
@@ -235,6 +246,15 @@ function drawCrop(c: Ctx, id: string, st: number, leaf: string, fruit: string) {
       ]) {
         fill(c, fruit, x, y, 2, 2);
         fill(c, '#fff3', x, y);
+      }
+    } else if (id === 'rose') {
+      for (const [x, y] of [
+        [4, 4],
+        [9, 3],
+        [6, 8],
+      ]) {
+        fill(c, fruit, x, y, 3, 3);
+        fill(c, '#f27a90', x, y, 1, 1);
       }
     } else if (id === 'sunflower') {
       fill(c, fruit, 4, 0, 8, 7);
