@@ -8,6 +8,10 @@ updates:
     commit-message:
       prefix: chore
       include: scope
+    # Major upgrades are planned migrations, not drive-by PRs.
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     groups:
       npm-minor-patch:
         update-types: [minor, patch]
