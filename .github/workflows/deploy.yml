@@ -1,0 +1,92 @@
+name: Deploy
+
+# Ships only what already passed CI on main.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # Workload Identity Federation
+
+env:
+  PROJECT: gen-lang-client-0992083758
+  FIRESTORE_DB: vuon-chung
+  RTDB_URL: https://vuon-chung-rtdb.asia-southeast1.firebasedatabase.app
+  SITE_URL: https://vuon-chung.web.app
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://vuon-chung.web.app
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      # No service-account key exists: WIF mints a short-lived token for this repo's main branch only.
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # firebase-tools silently skips rules deploys to a named Firestore database under
+      # WIF credentials, so publish the ruleset through the Rules API directly.
+      - name: Deploy Firestore rules
+        run: |
+          set -euo pipefail
+          token=$(gcloud auth print-access-token)
+          h=(-H "Authorization: Bearer $token" -H "x-goog-user-project: $PROJECT" -H "Content-Type: application/json")
+          body=$(jq -Rs '{source:{files:[{name:"firestore.rules",content:.}]}}' firestore.rules)
+          ruleset=$(curl -sSf -X POST "https://firebaserules.googleapis.com/v1/projects/$PROJECT/rulesets" "${h[@]}" -d "$body" | jq -r .name)
+          test -n "$ruleset" && [ "$ruleset" != null ]
+          release="projects/$PROJECT/releases/cloud.firestore/$FIRESTORE_DB"
+          # Releases can't be repointed with PATCH; delete then recreate is the idempotent path.
+          curl -s -o /dev/null -X DELETE "https://firebaserules.googleapis.com/v1/$release" "${h[@]}"
+          curl -sSf -X POST "https://firebaserules.googleapis.com/v1/projects/$PROJECT/releases" "${h[@]}" \
+            -d "$(jq -n --arg n "$release" --arg r "$ruleset" '{name:$n, rulesetName:$r}')" >/dev/null
+          echo "Firestore rules live on '$FIRESTORE_DB' ($ruleset)"
+
+      - name: Deploy Realtime Database rules
+        run: |
+          set -euo pipefail
+          token=$(gcloud auth print-access-token)
+          curl -sSf -X PUT "$RTDB_URL/.settings/rules.json" -H "Authorization: Bearer $token" \
+            -H "Content-Type: application/json" --data-binary @database.rules.json
+          # Read back and compare, so a silent no-op can't pass.
+          live=$(curl -sSf "$RTDB_URL/.settings/rules.json" -H "Authorization: Bearer $token" | jq -S .)
+          [ "$live" = "$(jq -S . database.rules.json)" ] || { echo "::error::RTDB rules did not apply"; exit 1; }
+
+      - name: Deploy hosting
+        run: npx firebase deploy --only hosting --project "$PROJECT" --non-interactive
+
+      # An SPA rewrite returns 200 for any path, so check content, not status codes.
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          html=$(curl -sSf --max-time 20 "$SITE_URL")
+          echo "$html" | grep -q '<div id="game">' || { echo "::error::App shell missing"; exit 1; }
+          asset=$(echo "$html" | grep -oE '/assets/[^"]+\.js' | head -1)
+          curl -sSf --max-time 30 "$SITE_URL$asset" | grep -q "$PROJECT" \
+            || { echo "::error::Bundle $asset missing or not wired to $PROJECT"; exit 1; }
+          echo "Smoke test passed ($asset)"
