@@ -4,6 +4,7 @@ import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type Cro
 import type { Animal } from './animals';
 import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
+import { activeRank, gainRoleXp, type PlayerState } from './roles';
 import { SPECIES, sellPrice, type SpeciesId } from './species';
 import { rainWaterings } from './weather';
 
@@ -45,6 +46,8 @@ export interface FarmState {
   feederDay: string;
   /** Today's duo order progress. */
   duo?: { day: string; by: string[]; xp: number };
+  /** Per-player role and rank progress, keyed by uid. */
+  players: Record<string, PlayerState>;
 }
 
 export type ActionResult =
@@ -67,6 +70,7 @@ export function newFarm(): FarmState {
     feed: [],
     animals: [],
     feederDay: '',
+    players: {},
   };
 }
 
@@ -134,19 +138,40 @@ export function water(s: FarmState, x: number, y: number, now: number, uid = 'lo
   if (isHydrated(withRain(crop, now), now)) return { ok: false, msg: 'already_wet' };
   crop.waterings.push(now);
   markCare(crop, uid, now);
+  const rank = activeRank(s, uid, 'grower');
+  if (rank >= 3) {
+    const reach = rank >= 5 ? [-1, 0, 1] : [0];
+    for (const dy of reach) {
+      for (const dx of [-1, 0, 1]) {
+        const near = s.plots[key(x + dx, y + dy)]?.crop;
+        if (near && near !== crop && !isHydrated(withRain(near, now), now)) {
+          near.waterings.push(now);
+          markCare(near, uid, now);
+        }
+      }
+    }
+  }
+  gainRoleXp(s, uid, 'grower', 1);
   return { ok: true, msg: bothHandsToday(crop, now) ? 'watered_both' : 'watered' };
 }
 
-export function harvest(s: FarmState, x: number, y: number, now: number): ActionResult {
+export function harvest(s: FarmState, x: number, y: number, now: number, uid = 'local'): ActionResult {
   const plot = s.plots[key(x, y)];
   const crop = plot?.crop;
   if (!plot || !crop) return { ok: false, msg: 'nothing_here' };
   if (cropStage(crop, now) !== 4) return { ok: false, msg: 'not_ready' };
   const sp = SPECIES[crop.species];
-  const stars = qualityStars(withRain(crop, now), growMsFor(crop), now, hadBothHands(crop));
+  const role = sp.flower ? 'florist' : 'grower';
+  const rank = activeRank(s, uid, role);
+  // Florist r3: flowers come out one star better. Grower r4 / Florist r4: one extra item.
+  const base = qualityStars(withRain(crop, now), growMsFor(crop), now, hadBothHands(crop));
+  const stars = Math.min(3, base + (sp.flower && rank >= 3 ? 1 : 0)) as 1 | 2 | 3;
+  // The rank-4 bonus item rewards care too: only on a 3★ harvest.
+  const amount = sp.yield + (rank >= 4 && stars === 3 ? 1 : 0);
   const item = `${crop.species}:${stars}`;
-  s.produce[item] = (s.produce[item] ?? 0) + sp.yield;
+  s.produce[item] = (s.produce[item] ?? 0) + amount;
   s.xp += sp.xp * stars;
+  gainRoleXp(s, uid, role, sp.xp * stars);
   if (sp.regrowMs) {
     // Regrowing plant: restart its clock, keep any watering (or rain) still in effect.
     const wet = withRain(crop, now).waterings.filter((w) => w <= now && now < w + WATER_MS);
@@ -157,7 +182,7 @@ export function harvest(s: FarmState, x: number, y: number, now: number): Action
   } else {
     delete plot.crop;
   }
-  return { ok: true, msg: 'harvested', vars: { species: crop.species, stars, n: sp.yield } };
+  return { ok: true, msg: 'harvested', vars: { species: crop.species, stars, n: amount } };
 }
 
 /** Moves all produce into the shipping bin. */
@@ -191,9 +216,16 @@ export function payout(s: FarmState, now: number): number {
   return value;
 }
 
-export function buySeeds(s: FarmState, species: SpeciesId, count = 1): ActionResult {
+/** Seed price for this player: Grower r2 −10% on crops, Florist r2 −20% on flowers. */
+export function seedPrice(s: FarmState, species: SpeciesId, uid = 'local'): number {
+  const sp = SPECIES[species];
+  const off = sp.flower ? (activeRank(s, uid, 'florist') >= 2 ? 0.2 : 0) : activeRank(s, uid, 'grower') >= 2 ? 0.1 : 0;
+  return Math.max(1, Math.floor(sp.seedCost * (1 - off)));
+}
+
+export function buySeeds(s: FarmState, species: SpeciesId, count = 1, uid = 'local'): ActionResult {
   if (!speciesUnlocked(species, s.xp)) return { ok: false, msg: 'locked', vars: { species } };
-  const cost = SPECIES[species].seedCost * count;
+  const cost = seedPrice(s, species, uid) * count;
   if (s.coins < cost) return { ok: false, msg: 'not_enough_coins' };
   s.coins -= cost;
   s.seeds[species] = (s.seeds[species] ?? 0) + count;
@@ -241,7 +273,7 @@ export function useTile(
   const state = plotState(plot, now);
   if (state === 'empty') return plant(s, x, y, selected, now, uid);
   if (state === 'needs_water') return water(s, x, y, now, uid);
-  if (state === 'ready') return harvest(s, x, y, now);
+  if (state === 'ready') return harvest(s, x, y, now, uid);
   // Already watered (or rained on): tending still counts toward "both hands".
   const tended = tend(s, x, y, uid, now);
   if (tended) return tended;

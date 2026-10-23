@@ -19,6 +19,7 @@ import {
 import { addMemory, partnerTendedToday, readLetters, sendLetter, treeStage, unreadFor } from '../sim/couple';
 import { animalPosition, buyAnimal, fedToday, fillFeeder, useAnimal } from '../sim/animals';
 import { deliverDuo, fulfill } from '../sim/orders';
+import { ROLE_IDS, chooseRole, rankFor } from '../sim/roles';
 import { UNLOCKS, isUnlocked, levelFor } from '../sim/progression';
 import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
@@ -84,6 +85,7 @@ export class FarmScene extends Phaser.Scene {
   private seenEmote = new Map<string, number>();
   private together = false;
   private togetherToastAt = -Infinity;
+  private ranks = new Map<string, number>();
   private busy = false;
   private presence?: Presence;
 
@@ -134,13 +136,14 @@ export class FarmScene extends Phaser.Scene {
     this.panels = new Panels({
       sendLetter: async (text) => (await this.run((s, ts, uid) => sendLetter(s, uid, text, ts)))?.ok ?? false,
       readLetters: () => void this.store.apply((s, _, uid) => readLetters(s, uid)).catch(console.error),
+      chooseRole: (role) => void this.run((s, ts, uid) => chooseRole(s, uid, role, ts)),
       addMemory: async (date, title) =>
         (await this.run((s, ts, uid) => addMemory(s, uid, date, title, ts)))?.ok ?? false,
     });
     this.hud.bind({
       onSelectSeed: (id) => this.selectSeed(id),
       onAction: () => void this.act(),
-      onBuy: (id, n) => void this.run((s) => buySeeds(s, id, n)),
+      onBuy: (id, n) => void this.run((s, _, uid) => buySeeds(s, id, n, uid)),
       onDeliver: (i) => void this.run((s, ts) => fulfill(s, i, ts)),
       onDeliverDuo: () => void this.run((s, ts, uid) => deliverDuo(s, uid, ts)),
       onBuyAnimal: () =>
@@ -408,10 +411,10 @@ export class FarmScene extends Phaser.Scene {
       }
     }
     const prop = propAt(x, y);
-    if (prop?.id === 'feeder') return this.run((s, ts) => fillFeeder(s, ts));
-    if (prop?.id === 'coop') return this.hud.openShop(this.store.farm);
+    if (prop?.id === 'feeder') return this.run((s, ts, uid) => fillFeeder(s, ts, uid));
+    if (prop?.id === 'coop') return this.hud.openShop(this.store.farm, this.store.uid);
     if (prop?.id === 'bin') return this.run((s, ts) => ship(s, ts));
-    if (prop?.id === 'stall') return this.hud.openShop(this.store.farm);
+    if (prop?.id === 'stall') return this.hud.openShop(this.store.farm, this.store.uid);
     if (prop?.id === 'sapling') return this.panels.openTree(this.store.farm, this.names());
     if (prop?.id === 'mailbox') return this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (prop?.id === 'board') {
@@ -461,10 +464,11 @@ export class FarmScene extends Phaser.Scene {
     this.level = lv;
     this.drawField();
     this.hud.render(this.store.farm, this.selected);
-    if (this.hud.shopOpen) this.hud.openShop(this.store.farm);
+    if (this.hud.shopOpen) this.hud.openShop(this.store.farm, this.store.uid);
     if (this.hud.ordersOpen) this.hud.openOrders(this.store.farm, now(), this.duoContext());
     if (this.panels.mailOpen) this.panels.openMail(this.store.farm, this.store.uid, this.names());
     if (this.panels.treeOpen) this.panels.openTree(this.store.farm, this.names());
+    this.syncRoles();
     this.feederImg.setTexture(fedToday(this.store.farm, now()) ? 'feeder_full' : 'feeder');
     this.hud.showEmotes(this.store.members.length >= 2);
     const stage = treeStage(this.store.farm);
@@ -521,6 +525,29 @@ export class FarmScene extends Phaser.Scene {
     const el = document.activeElement;
     // A field inside a dialog closed with Esc keeps focus while hidden: ignore it.
     return (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && el.offsetParent !== null;
+  }
+
+  /** Roles button (from level 3), live dialog refresh, and a toast on rank-ups. */
+  private syncRoles() {
+    const farm = this.store.farm;
+    const btn = document.querySelector<HTMLButtonElement>('#roles-btn')!;
+    btn.hidden = !isUnlocked('roles', farm.xp);
+    const me = farm.players[this.store.uid];
+    // Compact on the bar (icon + rank) so the language toggle stays on screen on phones.
+    const icon = { grower: '🌾', rancher: '🐔', florist: '🌸' } as const;
+    btn.textContent = me?.role ? `${icon[me.role]} ${rankFor(me.roleXp[me.role] ?? 0)}★` : '🧑‍🌾';
+    btn.title = me?.role ? t(`role.${me.role}`) : t('roles_btn');
+    btn.setAttribute('aria-label', btn.title);
+    btn.onclick = () => this.panels.openRoles(this.store.farm, this.store.uid, this.names());
+    if (this.panels.rolesOpen) this.panels.openRoles(farm, this.store.uid, this.names());
+    for (const role of ROLE_IDS) {
+      const rank = rankFor(me?.roleXp[role] ?? 0);
+      const before = this.ranks.get(role);
+      if (before !== undefined && rank > before) {
+        this.hud.toast(t('rank_up', { role: t(`role.${role}`), rank: t(`rank.${rank}`) }));
+      }
+      this.ranks.set(role, rank);
+    }
   }
 
   /** The duo order only exists when both partners are in the garden. */

@@ -14,6 +14,8 @@ export interface Species {
   /** Sell price of a 1-star item; 2★ = ×1.25, 3★ = ×1.5. */
   sellPrice: number;
   xp: number;
+  /** Flowers count for the Florist role; everything else for the Grower. */
+  flower?: boolean;
   /** Feature key from progression.UNLOCKS; absent = available from the start. */
   unlock?: string;
   /** Pixel colours used by the procedural sprite. */
@@ -47,6 +49,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
     yield: 1,
     sellPrice: 45,
     xp: 5,
+    flower: true,
     color: { leaf: '#558b2f', fruit: '#fbc02d' },
   },
   rose: {
@@ -56,6 +59,7 @@ export const SPECIES: Record<SpeciesId, Species> = {
     yield: 1,
     sellPrice: 80,
     xp: 8,
+    flower: true,
     unlock: 'rose',
     color: { leaf: '#3d8b3a', fruit: '#d6344f' },
   },

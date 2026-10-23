@@ -4,6 +4,7 @@ import { t } from '../i18n';
 import { LETTER_MAX, MEMORY_TITLE_MAX, awaySummary, type Letter } from '../sim/couple';
 import { now } from '../clock';
 import { vnDay, type FarmState } from '../sim/farm';
+import { ROLE_IDS, hasSynergy, rankFor, rankProgress, titleKey, type RoleId } from '../sim/roles';
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector(sel) as T;
 
@@ -12,6 +13,7 @@ export interface PanelHandlers {
   sendLetter(text: string): Promise<boolean>;
   readLetters(): void;
   addMemory(date: string, title: string): Promise<boolean>;
+  chooseRole(role: RoleId): void;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
@@ -32,7 +34,7 @@ function when(ts: number) {
 
 export class Panels {
   constructor(private h: PanelHandlers) {
-    for (const id of ['mail', 'tree', 'away']) {
+    for (const id of ['mail', 'tree', 'away', 'roles']) {
       $(`#${id}-close`).addEventListener('click', () => ($(`#${id}`).hidden = true));
     }
     $('#mail-form').addEventListener('submit', (e) => {
@@ -60,12 +62,53 @@ export class Panels {
     return !$('#tree').hidden;
   }
 
+  get rolesOpen() {
+    return !$('#roles').hidden;
+  }
+
+  /** Role cards: what each role is good at, your rank, perks by rank, and who has it. */
+  openRoles(s: FarmState, uid: string, names: Record<string, string>) {
+    this.labels();
+    const me = s.players[uid];
+    $('#roles-title').textContent = `${t(titleKey(me))}${hasSynergy(s) ? ` · ${t('synergy_on')}` : ''}`;
+    $('#roles-list').replaceChildren(
+      ...ROLE_IDS.map((role) => {
+        const xp = me?.roleXp[role] ?? 0;
+        const rank = rankFor(xp);
+        const mine = me?.role === role;
+        const card = el('article', `role${mine ? ' mine' : ''}`);
+        const head = el('header');
+        head.append(el('b', '', t(`role.${role}`)), el('span', '', `${t(`rank.${rank}`)} · ${rank}/5`));
+        const bar = el('i');
+        bar.style.setProperty('--p', `${Math.round(rankProgress(xp) * 100)}%`);
+        const perks = el('ul');
+        for (let r = 2; r <= 5; r++) {
+          perks.append(el('li', rank >= r ? 'got' : '', `${r}. ${t(`perk.${role}.${r}`)}`));
+        }
+        const holders = Object.entries(s.players)
+          .filter(([, p]) => p.role === role)
+          .map(([u]) => names[u] ?? '♥');
+        const foot = el('footer');
+        foot.append(el('small', '', holders.length ? `${t('role_held_by')} ${holders.join(', ')}` : ''));
+        const pick = el('button', '', mine ? t('role_current') : t('role_pick'));
+        pick.disabled = mine;
+        pick.addEventListener('click', () => this.h.chooseRole(role));
+        foot.append(pick);
+        card.append(head, el('p', 'muted', t(`role_desc.${role}`)), bar, perks, foot);
+        return card;
+      }),
+    );
+    $('#roles').hidden = false;
+  }
+
   close() {
-    for (const id of ['mail', 'tree', 'away']) $(`#${id}`).hidden = true;
+    for (const id of ['mail', 'tree', 'away', 'roles']) $(`#${id}`).hidden = true;
   }
 
   private labels() {
-    for (const e of document.querySelectorAll<HTMLElement>('#mail [data-t], #tree [data-t], #away [data-t]')) {
+    for (const e of document.querySelectorAll<HTMLElement>(
+      '#mail [data-t], #tree [data-t], #away [data-t], #roles [data-t]',
+    )) {
       e.textContent = t(e.dataset.t!);
     }
     $<HTMLTextAreaElement>('#mail-text').placeholder = t('mail_placeholder');

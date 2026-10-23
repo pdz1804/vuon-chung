@@ -1,7 +1,7 @@
 // DOM overlay: status bar, seed hotbar, bag, toasts, shop, and touch controls.
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
-import { binValue, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
+import { binValue, seedPrice, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
 import { ANIMALS } from '../sim/animals';
 import { boardFor, doneToday, duoDelivered, duoFor, haveCount } from '../sim/orders';
 import { isUnlocked } from '../sim/progression';
@@ -129,7 +129,7 @@ export class Hud {
     this.toastTimer = window.setTimeout(() => el.classList.remove('show'), 2600);
   }
 
-  openShop(s: FarmState) {
+  openShop(s: FarmState, uid = 'local') {
     $('#shop-title').textContent = t('shop');
     $('#shop-close').textContent = t('close');
     $('#shop-list').replaceChildren(
@@ -139,14 +139,14 @@ export class Hud {
         const sp = SPECIES[id];
         const locked = !speciesUnlocked(id, s.xp);
         const unlockLv = Object.entries(UNLOCKS).find(([, f]) => sp.unlock && f.includes(sp.unlock))?.[0];
-        const price = locked ? t('locked_at', { n: unlockLv ?? '?' }) : `${sp.seedCost} ${t('coins')}`;
+        const price = locked ? t('locked_at', { n: unlockLv ?? '?' }) : `${seedPrice(s, id, uid)} ${t('coins')}`;
         row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm">${t(`sp.${id}`)}<small>${price}</small></span>`;
         drawIcon(row.querySelector('canvas')!, id);
         if (locked) row.classList.add('locked');
         for (const n of locked ? [] : [1, 5]) {
           const b = document.createElement('button');
           b.textContent = `${t('buy')} ×${n}`;
-          b.disabled = s.coins < sp.seedCost * n;
+          b.disabled = s.coins < seedPrice(s, id, uid) * n;
           b.addEventListener('click', () => this.h.onBuy(id, n));
           row.append(b);
         }

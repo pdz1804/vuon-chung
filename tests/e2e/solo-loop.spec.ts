@@ -150,3 +150,20 @@ test('chickens: buy a chick, fill the feeder, pet it and collect an egg', async 
   expect(f.animals[0].hearts).toBe(1);
   expect(f.produce['egg:1']).toBe(1);
 });
+
+test('roles unlock at level 3 and can be picked', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => window.__qa);
+  await expect(page.locator('#roles-btn')).toBeHidden();
+  await page.evaluate(() => {
+    (window.__qa.farm() as unknown as { xp: number }).xp = 300;
+    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+  });
+  await page.locator('#roles-btn').click();
+  await expect(page.locator('#roles-list .role')).toHaveCount(3);
+  await page.locator('#roles-list .role').first().locator('button').click();
+  await expect(page.locator('#roles-list .role.mine')).toHaveCount(1);
+  await expect(page.locator('#roles-btn')).toHaveAttribute('title', /Nhà nông|Grower/);
+});

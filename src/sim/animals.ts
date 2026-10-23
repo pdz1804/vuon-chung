@@ -3,6 +3,7 @@
 // lazily (no server tick) and identically for both partners.
 import { vnDay, type ActionResult, type FarmState } from './farm';
 import { isUnlocked } from './progression';
+import { activeRank, gainRoleXp } from './roles';
 
 export type AnimalSpecies = 'chicken';
 
@@ -76,10 +77,12 @@ export function buyAnimal(s: FarmState, species: AnimalSpecies, name: string, no
 }
 
 /** One fill covers every animal for the whole Vietnam day. */
-export function fillFeeder(s: FarmState, now: number): ActionResult {
+export function fillFeeder(s: FarmState, now: number, uid = 'local'): ActionResult {
   if (!s.animals.length) return { ok: false, msg: 'no_animals' };
   if (fedToday(s, now)) return { ok: false, msg: 'feeder_full' };
-  const cost = s.animals.reduce((sum, a) => sum + ANIMALS[a.species].feedCost, 0);
+  const full = s.animals.reduce((sum, a) => sum + ANIMALS[a.species].feedCost, 0);
+  // Rancher r3: feed costs half.
+  const cost = activeRank(s, uid, 'rancher') >= 3 ? Math.ceil(full / 2) : full;
   if (s.coins < cost) return { ok: false, msg: 'not_enough_coins' };
   s.coins -= cost;
   const day = vnDay(now);
@@ -104,18 +107,26 @@ export function pet(s: FarmState, id: string, uid: string, now: number): ActionR
   const both = new Set(who).size >= 2;
   // `hearts` stays raw: neglect is still subtracted lazily from `fedDay`, so
   // settling it here as well would count the hungry days twice.
-  a.hearts = Math.min(MAX_HEARTS, a.hearts + (both ? 2 : 1));
+  // Rancher r2: one extra heart per pet.
+  const bonus = activeRank(s, uid, 'rancher') >= 2 ? 1 : 0;
+  a.hearts = Math.min(MAX_HEARTS, a.hearts + (both ? 2 : 1) + bonus);
+  gainRoleXp(s, uid, 'rancher', 3);
   return { ok: true, msg: both ? 'petted_both' : 'petted', vars: { name: a.name, n: effectiveHearts(a, now) } };
 }
 
-export function collectEgg(s: FarmState, id: string, now: number): ActionResult {
+export function collectEgg(s: FarmState, id: string, now: number, uid = 'local'): ActionResult {
   const a = s.animals.find((x) => x.id === id);
   if (!a) return { ok: false, msg: 'nothing_here' };
   if (!fedToday(s, now)) return { ok: false, msg: 'hungry', vars: { name: a.name } };
   if (!eggReady(s, a, now)) return { ok: false, msg: 'no_egg', vars: { name: a.name } };
-  const stars = eggStars(a, now);
+  const rank = activeRank(s, uid, 'rancher');
+  // Rancher r4: eggs one star better. r5: two eggs when someone petted it today.
+  const stars = Math.min(3, eggStars(a, now) + (rank >= 4 ? 1 : 0)) as 1 | 2 | 3;
+  // Rank 5: two eggs from a chicken both partners petted today.
+  const count = rank >= 5 && new Set(a.pets[vnDay(now)] ?? []).size >= 2 ? 2 : 1;
   const item = `egg:${stars}`;
-  s.produce[item] = (s.produce[item] ?? 0) + 1;
+  s.produce[item] = (s.produce[item] ?? 0) + count;
+  gainRoleXp(s, uid, 'rancher', 2 * stars);
   a.collectedDay = vnDay(now);
   s.xp += 2 * stars;
   return { ok: true, msg: 'egg_collected', vars: { stars } };
@@ -126,7 +137,7 @@ export function useAnimal(s: FarmState, id: string, uid: string, now: number): A
   const a = s.animals.find((x) => x.id === id);
   if (!a) return { ok: false, msg: 'nothing_here' };
   if (!(a.pets[vnDay(now)] ?? []).includes(uid)) return pet(s, id, uid, now);
-  if (eggReady(s, a, now)) return collectEgg(s, id, now);
+  if (eggReady(s, a, now)) return collectEgg(s, id, now, uid);
   return {
     ok: false,
     msg: fedToday(s, now) ? 'animal_happy' : 'hungry',

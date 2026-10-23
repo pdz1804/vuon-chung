@@ -17,6 +17,7 @@
         <span id="xp" class="pill"></span>
         <span id="clock" class="pill"></span>
         <span id="binval" class="pill muted-pill"></span>
+        <button id="roles-btn" class="pill btn" type="button" hidden></button>
         <button id="invite" class="pill btn invite" type="button" hidden></button>
         <button id="lang" class="pill btn" type="button" aria-label="Language"></button>
       </header>
@@ -71,6 +72,14 @@
             <button id="enter" class="big" type="button" data-t="enter"></button>
           </section>
           <p id="lobby-error" role="alert"></p>
+        </div>
+      </div>
+      <div id="roles" class="modal" hidden>
+        <div class="sheet">
+          <h2 data-t="roles_title"></h2>
+          <p id="roles-title" class="muted"></p>
+          <div id="roles-list"></div>
+          <button id="roles-close" class="btn close" type="button" data-t="close"></button>
         </div>
       </div>
       <div id="mail" class="modal" hidden>

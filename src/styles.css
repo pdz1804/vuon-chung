@@ -620,3 +620,79 @@ body {
   border-radius: 10px;
   padding: 4px;
 }
+
+/* Roles */
+#roles-list {
+  display: grid;
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.role {
+  background: #fff;
+  border: 2px solid var(--wood-light);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+}
+.role.mine {
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 3px #d7efc6;
+}
+.role header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+.role header b {
+  font: 800 17px var(--display);
+  color: var(--leaf);
+}
+.role header span {
+  font-size: 13px;
+  color: var(--wood);
+  font-weight: 800;
+}
+.role p {
+  margin: 0;
+  font-size: 13px;
+}
+.role > i {
+  display: block;
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--bloom) var(--p, 0%), #eadfca var(--p, 0%));
+}
+.role ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: #8a7a60;
+  display: grid;
+  gap: 2px;
+}
+.role li.got {
+  color: var(--ink);
+  font-weight: 700;
+}
+.role footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.role footer button {
+  font: 800 14px var(--font);
+  border: 2px solid var(--wood);
+  background: #ffd54a;
+  border-radius: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.role footer button:disabled {
+  background: #d7efc6;
+  cursor: default;
+}
