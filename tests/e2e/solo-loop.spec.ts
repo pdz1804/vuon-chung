@@ -12,6 +12,12 @@ type QaWindow = Window & { __qa: QaHook };
 // Fast dev clock: 1 real second = 1 game hour, own save slot.
 const URL = '/?speed=3600#qa';
 
+// Pin the game clock to 20 Oct 2026 08:00 in Vietnam, a dry day: the weather is
+// seeded from the date, so a real "today" can rain and water plots on its own.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('vuon-chung:dev-clock', String(Date.UTC(2026, 9, 20, 1, 0))));
+});
+
 async function standFacing(page: Page, x: number, y: number) {
   // Stand one tile above the target and face down.
   await page.evaluate(
