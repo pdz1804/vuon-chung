@@ -200,3 +200,21 @@ test('kitchen opens at level 5 from the house door and cooks a dish', async ({ p
     )
     .toBe(1);
 });
+
+test('dialog buttons work from the keyboard', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'physical keyboard only');
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => window.__qa);
+  await standFacing(page, 24, 4); // Cô Ba's stall
+  await page.keyboard.press('Space');
+  await expect(page.locator('#shop')).toBeVisible();
+  const coins = await page.evaluate(() => window.__qa.farm().coins);
+  await page.locator('#shop-list .shop-row button').first().focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => page.evaluate(() => window.__qa.farm().coins)).toBeLessThan(coins);
+  await page.locator('#shop-close').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#shop')).toBeHidden();
+});

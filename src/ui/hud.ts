@@ -59,7 +59,9 @@ export class Hud {
       'click',
       (e) => {
         const modal = (e.target as HTMLElement | null)?.closest('.modal');
-        if (modal && downAt < Number((modal as HTMLElement).dataset.openedAt ?? 0)) {
+        // Keyboard and assistive-tech activations have detail 0 and are always intended.
+        const fromPointer = e.detail > 0;
+        if (fromPointer && modal && downAt < Number((modal as HTMLElement).dataset.openedAt ?? 0)) {
           e.stopPropagation();
           e.preventDefault();
         }
