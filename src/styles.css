@@ -723,3 +723,181 @@ body {
     height: 48px;
   }
 }
+
+/* Room list */
+#room-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.room {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--wood-light);
+  background: #fff;
+  cursor: pointer;
+  font-family: var(--font);
+  color: var(--ink);
+}
+.room:hover,
+.room:focus-visible {
+  border-color: var(--leaf);
+  outline: none;
+}
+.room b {
+  font: 800 16px var(--display);
+  color: var(--leaf);
+}
+.room small {
+  grid-column: 1;
+  color: var(--wood);
+  font-weight: 700;
+}
+.room .badge {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #fff1c2;
+  border: 1px solid #e2b04a;
+}
+.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+.lobby .link {
+  background: none;
+  border: 0;
+  color: var(--wood);
+  text-decoration: underline;
+  cursor: pointer;
+  font: 700 14px var(--font);
+}
+
+/* 3D view layers */
+#game {
+  overflow: hidden;
+}
+#game canvas {
+  image-rendering: auto;
+  display: block;
+}
+.labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.name-tag {
+  font: 800 13px var(--font);
+  color: #fff;
+  background: rgba(43, 42, 36, 0.55);
+  padding: 1px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.emote-bubble {
+  font-size: 26px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 2px 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  animation: pop 0.25s ease-out;
+}
+.heart-bubble {
+  font-size: 22px;
+  animation: bob 1.2s ease-in-out infinite;
+}
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes bob {
+  50% {
+    transform: translateY(-6px);
+  }
+}
+#loading {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #cdeeb8, #7cc45a);
+}
+#loading[hidden] {
+  display: none;
+}
+.loading-card {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+}
+#loading-bar {
+  width: min(260px, 70vw);
+  height: 10px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+}
+#loading-bar i {
+  display: block;
+  height: 100%;
+  width: var(--p, 5%);
+  background: #2f7d4f;
+  transition: width 0.2s;
+}
+#looks canvas {
+  width: 72px;
+  height: 72px;
+  image-rendering: auto;
+}
+
+/* Fatal start-up message */
+.fatal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 40%, #cdeeb8, #7cc45a);
+  font: 700 17px var(--font);
+  color: var(--ink);
+}
+.fatal[hidden] {
+  display: none;
+}
+/* Room cards never push the badge out */
+.room {
+  min-width: 0;
+}
+.room b,
+.room small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

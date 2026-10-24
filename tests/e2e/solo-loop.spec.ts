@@ -3,8 +3,9 @@ import type { FarmState } from '../../src/sim/farm';
 
 // Shape of the `window.__qa` hook the game exposes when the URL hash is #qa.
 interface QaHook {
-  scene: { player: { setPosition(x: number, y: number): void }; facing: string };
+  view: { player: { x: number; y: number; facing: string }; animalPos: Map<string, { x: number; y: number }> };
   farm(): FarmState;
+  refresh(): void;
 }
 type QaWindow = Window & { __qa: QaHook };
 
@@ -15,9 +16,11 @@ async function standFacing(page: Page, x: number, y: number) {
   // Stand one tile above the target and face down.
   await page.evaluate(
     ([tx, ty]) => {
-      const s = (window as unknown as QaWindow).__qa.scene;
-      s.player.setPosition(tx * 16 + 8, (ty - 1) * 16 + 4);
-      s.facing = 'down';
+      // Player positions are in tiles; stand in the middle of the tile above.
+      const p = (window as unknown as QaWindow).__qa.view.player;
+      p.x = tx + 0.5;
+      p.y = ty - 0.5;
+      p.facing = 'down';
     },
     [x, y],
   );
@@ -86,7 +89,7 @@ test('order board unlocks at level 2 and pays for a delivery', async ({ page }) 
     const f = window.__qa.farm() as unknown as { xp: number; produce: Record<string, number> };
     f.xp = 100;
     for (const s of ['rau_muong', 'strawberry', 'sunflower']) f.produce[`${s}:1`] = 10;
-    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+    window.__qa.refresh();
   });
   await page.keyboard.press('Space');
   await expect(page.locator('#orders')).toBeVisible();
@@ -117,7 +120,7 @@ test('chickens: buy a chick, fill the feeder, pet it and collect an egg', async 
     const f = window.__qa.farm() as unknown as { xp: number; coins: number };
     f.xp = 100;
     f.coins = 1000;
-    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+    window.__qa.refresh();
   });
   await standFacing(page, 2, 8); // coop opens the shop
   await page.keyboard.press('Space');
@@ -136,15 +139,11 @@ test('chickens: buy a chick, fill the feeder, pet it and collect an egg', async 
   // Walk up to the chicken wherever it wandered and use it twice: pet, then egg.
   for (let i = 0; i < 2; i++) {
     await page.evaluate(() => {
-      const s = window.__qa.scene as unknown as {
-        animalSprites: Map<string, { x: number; y: number }>;
-        player: { setPosition(x: number, y: number): void };
-        facing: string;
-        time: { paused: boolean };
-      };
-      const c = [...s.animalSprites.values()][0];
-      s.player.setPosition(c.x, c.y - 16);
-      s.facing = 'down';
+      const v = window.__qa.view;
+      const c = [...v.animalPos.values()][0];
+      v.player.x = c.x;
+      v.player.y = c.y - 1;
+      v.player.facing = 'down';
     });
     await page.keyboard.press('Space');
     await page.waitForTimeout(300);
@@ -162,7 +161,7 @@ test('roles unlock at level 3 and can be picked', async ({ page }) => {
   await expect(page.locator('#roles-btn')).toBeHidden();
   await page.evaluate(() => {
     (window.__qa.farm() as unknown as { xp: number }).xp = 300;
-    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+    window.__qa.refresh();
   });
   await page.locator('#roles-btn').click();
   await expect(page.locator('#roles-list .role')).toHaveCount(3);
@@ -180,7 +179,7 @@ test('kitchen opens at level 5 from the house door and cooks a dish', async ({ p
     const f = window.__qa.farm() as unknown as { xp: number; produce: Record<string, number> };
     f.xp = 1100;
     f.produce['strawberry:2'] = 4;
-    (window.__qa.scene as unknown as { refresh(): void }).refresh();
+    window.__qa.refresh();
   });
   await standFacing(page, 5, 4); // house front wall
   await page.keyboard.press('Space');

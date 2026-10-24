@@ -1,28 +1,46 @@
-import Phaser from 'phaser';
 import { DEV } from './clock';
-import { FarmScene, type SceneBoot } from './game/farm-scene';
+import { GameController, type GameBoot } from './game/controller';
+import { iconFor, prepareIcons } from './game/icons';
+import { Farm3DView } from './game/view3d';
 import { t } from './i18n';
 import { Presence } from './net/presence';
 import { LocalStore } from './net/world-store';
-import { Hud } from './ui/hud';
+import { Hud, setIconSource } from './ui/hud';
 import { inviteFromGame, runLobby } from './ui/lobby';
 
 // Solo mode: the fast dev clock or ?local=1 play offline against localStorage.
 const LOCAL = DEV || new URLSearchParams(location.search).has('local');
 
-function start(boot: SceneBoot) {
-  new Phaser.Game({
-    type: Phaser.AUTO,
-    parent: 'game',
-    backgroundColor: '#5f9f42',
-    pixelArt: true,
-    scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-    physics: { default: 'arcade', arcade: { debug: false } },
-    scene: [new FarmScene(boot)],
+function start(boot: Omit<GameBoot, 'view'>) {
+  setIconSource(iconFor);
+  void prepareIcons().then(() => boot.hud.render(boot.store.farm, 'rau_muong'));
+  const game = new GameController({ ...boot, view: new Farm3DView() });
+  game.start(document.querySelector('#game')!).catch((e) => {
+    console.error(e);
+    showFatal(t('fatal_load'));
   });
 }
 
+/** A clear message with a reload button when the 3D garden can't start. */
+function showFatal(msg: string) {
+  document.querySelector('#loading')?.setAttribute('hidden', '');
+  const card = document.querySelector<HTMLElement>('#fatal')!;
+  card.querySelector('p')!.textContent = msg;
+  card.querySelector('button')!.textContent = t('retry');
+  card.querySelector('button')!.onclick = () => location.reload();
+  card.hidden = false;
+}
+
+function webglAvailable() {
+  try {
+    return !!document.createElement('canvas').getContext('webgl2');
+  } catch {
+    return false;
+  }
+}
+
 const hud = new Hud();
+if (!webglAvailable()) showFatal(t('fatal_webgl'));
 
 if (LOCAL) {
   const store = new LocalStore();
@@ -36,6 +54,13 @@ if (LOCAL) {
     };
     invite.onclick = () => void inviteFromGame(store).catch(() => hud.toast(t('sync_error')));
     store.onChange(syncInvite);
+    const rooms = document.querySelector<HTMLButtonElement>('#rooms-btn')!;
+    rooms.hidden = false;
+    rooms.title = t('switch_room');
+    rooms.onclick = () => {
+      const emu = new URLSearchParams(location.search).get('emu') === '1' ? '&emu=1' : '';
+      location.href = `/?rooms=1${emu}${location.hash}`;
+    };
     document.querySelector('#lang')!.addEventListener('click', syncInvite);
     syncInvite();
     start({

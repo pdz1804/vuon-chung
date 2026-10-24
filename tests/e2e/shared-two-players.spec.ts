@@ -4,9 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 // browser contexts sign in as two people and share one garden.
 
 interface Qa {
-  scene: { player: { setPosition(x: number, y: number): void }; facing: string };
+  view: { player: { x: number; y: number; facing: string } };
   farm(): { plots: Record<string, { crop?: { species: string } }> };
-  partners: Map<string, unknown>;
+  partners: { size(): number };
 }
 declare global {
   interface Window {
@@ -22,8 +22,10 @@ async function signIn(page: Page, name: string) {
 async function standFacing(page: Page, x: number, y: number) {
   await page.evaluate(
     ([tx, ty]) => {
-      window.__qa.scene.player.setPosition(tx * 16 + 8, (ty - 1) * 16 + 4);
-      window.__qa.scene.facing = 'down';
+      const p = window.__qa.view.player;
+      p.x = tx + 0.5;
+      p.y = ty - 0.5;
+      p.facing = 'down';
     },
     [x, y],
   );
@@ -36,6 +38,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   // Alice creates the garden and gets an invite link.
   await a.goto('/?emu=1#qa');
   await signIn(a, 'alice');
+  await a.locator('#new-room').click();
   await a.locator('#looks button[data-look="su"]').click();
   await a.locator('#create').click();
   await expect(a.locator('#invite-link')).toHaveValue(/\?join=[a-z2-9]{26}$/);
@@ -51,8 +54,8 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await b.waitForFunction(() => window.__qa);
 
   // Each sees the other's avatar; Alice's invite button disappears.
-  await a.waitForFunction(() => window.__qa.partners.size === 1);
-  await b.waitForFunction(() => window.__qa.partners.size === 1);
+  await a.waitForFunction(() => window.__qa.partners.size() === 1);
+  await b.waitForFunction(() => window.__qa.partners.size() === 1);
   await expect(a.locator('#invite')).toBeHidden();
 
   // Alice tills and plants; Bob's copy of the farm updates.
@@ -89,8 +92,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await expect(a.locator('#emotes')).toBeVisible();
   await a.locator('#emotes button[data-e="❤️"]').click();
   await b.waitForFunction(() => {
-    const s = window.__qa.scene as unknown as { children: { list: { text?: string }[] } };
-    return s.children.list.some((c) => c.text === '❤️');
+    return [...document.querySelectorAll('.emote-bubble')].some((e) => e.textContent === '❤️');
   });
 
   // An invite can't be reused by a third person.
@@ -100,28 +102,40 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await expect(c.locator('#lobby-error')).not.toBeEmpty();
 });
 
-test('an invite wins over a garden you started alone', async ({ browser }) => {
-  const a = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
-  const b = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
+test('a player can belong to several gardens and switch between them', async ({ browser }) => {
+  const ctx = { baseURL: 'http://localhost:5240' };
+  const a = await (await browser.newContext(ctx)).newPage();
+  const b = await (await browser.newContext(ctx)).newPage();
 
-  // Bob starts a solo garden first.
+  // Bob starts a garden of his own first, marked as a test room.
   await b.goto('/?emu=1#qa');
   await signIn(b, 'bob2');
+  await b.locator('#new-room').click();
+  await b.locator('#room-name').fill('Bob solo');
+  await b.locator('#room-test').check();
   await b.locator('#create').click();
   await b.locator('#enter').click();
   await b.waitForFunction(() => window.__qa);
 
   await a.goto('/?emu=1#qa');
   await signIn(a, 'alice2');
+  await a.locator('#new-room').click();
+  await a.locator('#room-name').fill('Vườn của hai đứa');
   await a.locator('#create').click();
   await expect(a.locator('#invite-link')).toHaveValue(/join=/);
   const code = new URL(await a.locator('#invite-link').inputValue()).searchParams.get('join');
   await a.locator('#enter').click();
   await a.waitForFunction(() => window.__qa);
 
-  // Opening Alice's link moves Bob into her garden.
+  // Bob joins Alice's garden: it is added, his own garden stays.
   await b.goto(`/?join=${code}&emu=1#qa`);
   await b.waitForFunction(() => window.__qa);
-  await a.waitForFunction(() => window.__qa.partners.size === 1);
-  await expect(a.locator('#invite')).toBeHidden();
+  await a.waitForFunction(() => window.__qa.partners.size() === 1);
+
+  // The room list shows both gardens, the test room with its badge.
+  await b.locator('#rooms-btn').click();
+  await expect(b.locator('#room-list .room')).toHaveCount(2);
+  await expect(b.locator('#room-list .room', { hasText: 'Bob solo' })).toContainText(/Thử nghiệm|Test/);
+  await b.locator('#room-list .room', { hasText: 'Vườn của hai đứa' }).click();
+  await b.waitForFunction(() => window.__qa);
 });

@@ -65,3 +65,11 @@ export const BLOCKING: Ground[] = ['water', 'fence', 'tree'];
 export const SPAWN = { x: 15, y: 7 };
 /** Where chickens wander, in pixels (left of the field fence). */
 export const PEN = { x0: 1.5 * 16, y0: 10.5 * 16, x1: 7.5 * 16, y1: 16 * 16 };
+
+const GROUND = buildGround();
+
+/** Walls for the farmer: trees, fences, water and every prop's footprint. */
+export function isBlocked(x: number, y: number): boolean {
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return true;
+  return BLOCKING.includes(GROUND[y][x]) || !!propAt(x, y);
+}

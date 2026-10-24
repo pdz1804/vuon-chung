@@ -17,6 +17,7 @@ import { now as clockNow, setClockOffset } from '../clock';
 import { loadFarm, saveFarm } from '../save';
 import { isFromNewerApp, migrate, newFarm, type ActionResult, type FarmState } from '../sim/farm';
 import { FEED_WORTHY, logEvent } from '../sim/couple';
+import { levelFor } from '../sim/progression';
 import { db } from './firebase';
 
 /** The single player of a solo farm. */
@@ -154,9 +155,52 @@ export async function syncServerClock(uid: string) {
   if (typeof server === 'number') setClockOffset(server - (before + Date.now()) / 2);
 }
 
-export async function findMyWorld(uid: string): Promise<string | null> {
-  const snap = await getDoc(doc(db, 'users', uid));
-  return (snap.data()?.worldId as string | undefined) ?? null;
+/** A room as shown in the lobby list. */
+export interface RoomSummary {
+  id: string;
+  name: string;
+  test: boolean;
+  members: number;
+  partner: string;
+  level: number;
+}
+
+interface UserDoc {
+  rooms?: string[];
+  /** Pre-rooms single garden, still honoured. */
+  worldId?: string;
+  lastRoom?: string;
+}
+
+/** Every room this player belongs to, plus the one they played last. */
+export async function myRooms(uid: string): Promise<{ rooms: string[]; lastRoom: string | null }> {
+  const d = (await getDoc(doc(db, 'users', uid))).data() as UserDoc | undefined;
+  const rooms = [...new Set([...(d?.rooms ?? []), ...(d?.worldId ? [d.worldId] : [])])];
+  return { rooms, lastRoom: d?.lastRoom ?? d?.worldId ?? null };
+}
+
+export async function roomSummary(id: string, uid: string): Promise<RoomSummary | null> {
+  try {
+    const d = (await getDoc(doc(db, 'worlds', id))).data() as
+      (WorldDoc & { name?: string; test?: boolean }) | undefined;
+    if (!d) return null;
+    const partner = (d.members ?? []).find((m) => m !== uid);
+    const farm = migrate(d.farm);
+    return {
+      id,
+      name: d.name ?? '',
+      test: !!d.test,
+      members: d.members?.length ?? 0,
+      partner: partner ? (d.profiles?.[partner]?.name ?? '') : '',
+      level: levelFor(farm.xp),
+    };
+  } catch {
+    return null; // not a member any more, or offline
+  }
+}
+
+export function rememberRoom(uid: string, id: string) {
+  return setDoc(doc(db, 'users', uid), { lastRoom: id, rooms: arrayUnion(id) }, { merge: true });
 }
 
 export async function worldMemberCount(worldId: string): Promise<number> {
@@ -164,16 +208,19 @@ export async function worldMemberCount(worldId: string): Promise<number> {
   return (snap.data() as WorldDoc | undefined)?.members?.length ?? 0;
 }
 
-export async function createWorld(uid: string, profile: Profile): Promise<string> {
+/** Creates a room for this player. A player may own or join any number of rooms. */
+export async function createWorld(uid: string, profile: Profile, name = '', test = false): Promise<string> {
   const ref = doc(db, 'worlds', randomId(20));
   await setDoc(ref, {
     members: [uid],
     profiles: { [uid]: profile },
     farm: newFarm(),
+    name: name.trim().slice(0, 30),
+    test,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  await setDoc(doc(db, 'users', uid), { worldId: ref.id }, { merge: true });
+  await rememberRoom(uid, ref.id);
   return ref.id;
 }
 
@@ -206,7 +253,7 @@ export async function joinWithInvite(code: string, uid: string, name: string): P
     joinCode: code,
   });
   batch.delete(doc(db, 'invites', code));
-  batch.set(doc(db, 'users', uid), { worldId }, { merge: true });
+  batch.set(doc(db, 'users', uid), { rooms: arrayUnion(worldId), lastRoom: worldId }, { merge: true });
   await batch.commit();
   return worldId;
 }

@@ -11,12 +11,23 @@
   </head>
   <body>
     <div id="game"></div>
+    <div id="loading" hidden>
+      <div class="loading-card">
+        <h1 class="brand">Vườn Chung</h1>
+        <div id="loading-bar"><i></i></div>
+      </div>
+    </div>
+    <div id="fatal" class="fatal" role="alert" hidden>
+      <p></p>
+      <button type="button" class="big"></button>
+    </div>
     <div id="ui">
       <header id="status">
         <span id="coins" class="pill"></span>
         <span id="xp" class="pill"></span>
         <span id="clock" class="pill"></span>
         <span id="binval" class="pill muted-pill"></span>
+        <button id="rooms-btn" class="pill btn" type="button" hidden>🏡</button>
         <button id="roles-btn" class="pill btn" type="button" hidden></button>
         <button id="invite" class="pill btn invite" type="button" hidden></button>
         <button id="lang" class="pill btn" type="button" aria-label="Language"></button>
@@ -48,19 +59,27 @@
           </section>
           <section data-panel="loading"><p data-t="loading"></p></section>
           <section data-panel="retry"><button id="retry" class="big" type="button" data-t="retry"></button></section>
-          <section data-panel="create">
-            <h2 data-t="new_garden"></h2>
-            <p data-t="pick_look"></p>
-            <div id="looks">
-              <button type="button" class="on" data-look="phu"><canvas width="16" height="16"></canvas></button>
-              <button type="button" data-look="su"><canvas width="16" height="16"></canvas></button>
-            </div>
-            <button id="create" class="big" type="button" data-t="create"></button>
+          <section data-panel="rooms">
+            <h2 data-t="rooms_title"></h2>
+            <ul id="room-list"></ul>
+            <button id="new-room" class="big" type="button" data-t="new_garden"></button>
             <p class="or" data-t="or_join"></p>
             <form id="join">
               <input id="join-code" autocomplete="off" />
               <button type="submit" data-t="join"></button>
             </form>
+          </section>
+          <section data-panel="create">
+            <h2 data-t="new_garden"></h2>
+            <input id="room-name" autocomplete="off" maxlength="30" />
+            <label class="check"><input id="room-test" type="checkbox" /> <span data-t="test_room"></span></label>
+            <p data-t="pick_look"></p>
+            <div id="looks">
+              <button type="button" class="on" data-look="phu"><canvas width="96" height="96"></canvas></button>
+              <button type="button" data-look="su"><canvas width="96" height="96"></canvas></button>
+            </div>
+            <button id="create" class="big" type="button" data-t="create"></button>
+            <button id="back-rooms" class="link" type="button" data-t="back_rooms"></button>
           </section>
           <section data-panel="invite">
             <h2 data-t="invite_title"></h2>

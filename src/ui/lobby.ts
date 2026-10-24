@@ -9,17 +9,19 @@ import {
   signInWithRedirect,
   type User,
 } from 'firebase/auth';
-import { drawAvatar } from '../game/textures';
+import { renderIcon } from '../game/icons';
 import { t } from '../i18n';
 import { EMULATORS, auth } from '../net/firebase';
 import {
   SharedStore,
   createInvite,
   createWorld,
-  findMyWorld,
+  myRooms,
+  rememberRoom,
+  roomSummary,
+  type RoomSummary,
   joinWithInvite,
   syncServerClock,
-  worldMemberCount,
   type Look,
 } from '../net/world-store';
 
@@ -89,6 +91,24 @@ export function runLobby(): Promise<LobbyResult> {
       }
     };
 
+    let entering = false;
+    const enter = async (worldId: string, uid: string, isNew = false) => {
+      if (entering) return; // double clicks
+      entering = true;
+      // Drop ?rooms=1 so the 🏡 button and reloads behave from inside the garden.
+      history.replaceState(null, '', location.pathname + keepParams() + location.hash);
+      let store: SharedStore;
+      try {
+        store = await SharedStore.open(worldId, uid);
+      } catch (e) {
+        entering = false;
+        throw e;
+      }
+      void rememberRoom(uid, worldId);
+      $('#lobby').hidden = true;
+      resolve({ store, isNew });
+    };
+
     const handleUser = async (user: User | null) => {
       if (!user) return show('signin');
       if (started) return;
@@ -96,31 +116,32 @@ export function runLobby(): Promise<LobbyResult> {
       show('loading');
       try {
         await syncServerClock(user.uid);
-        let worldId = await findMyWorld(user.uid);
-        // A partner's invite wins over a garden you only started alone; a garden
-        // you already share is never left behind by opening some link.
-        const ownIsSolo = worldId ? (await worldMemberCount(worldId)) < 2 : true;
-        if (joinCode && ownIsSolo) {
+        setupCreate(user, enter);
+        if (joinCode) {
           // One attempt per link: drop the code so a retry doesn't loop on a bad invite.
           const code = joinCode;
           joinCode = null;
-          history.replaceState(null, '', location.pathname + location.hash);
+          history.replaceState(null, '', location.pathname + keepParams() + location.hash);
           try {
-            worldId = await joinWithInvite(code, user.uid, displayName(user));
+            return await enter(await joinWithInvite(code, user.uid, displayName(user)), user.uid);
           } catch (e) {
-            if (!worldId) throw e; // no garden to fall back to
-            console.warn('invite rejected; opening your own garden', e);
+            await showRooms(user, enter);
+            return error(e);
           }
         }
-        if (worldId) {
-          const store = await SharedStore.open(worldId, user.uid);
-          $('#lobby').hidden = true;
-          return resolve({ store, isNew: false });
+        const { rooms, lastRoom } = await myRooms(user.uid);
+        // Straight back into the last garden unless the room list was asked for;
+        // if that garden can't be opened, fall back to the list instead of looping.
+        if (!params.has('rooms') && lastRoom && rooms.includes(lastRoom)) {
+          try {
+            return await enter(lastRoom, user.uid);
+          } catch (e) {
+            await showRooms(user, enter);
+            return error(e);
+          }
         }
-        show('create');
-        setupCreate(user, resolve);
+        await showRooms(user, enter);
       } catch (e) {
-        // Never fall through to "create": that could orphan an existing garden.
         started = false;
         show('retry');
         $('#retry').onclick = () => void handleUser(auth.currentUser);
@@ -131,25 +152,71 @@ export function runLobby(): Promise<LobbyResult> {
   });
 }
 
-function setupCreate(user: User, resolve: (r: LobbyResult) => void) {
+/** Query params worth keeping when cleaning the URL (emulator mode). */
+function keepParams() {
+  const p = new URLSearchParams(location.search);
+  return p.get('emu') === '1' ? '?emu=1' : '';
+}
+
+type Enter = (worldId: string, uid: string, isNew?: boolean) => Promise<void>;
+
+/** The room list: every garden you belong to, newest last. */
+async function showRooms(user: User, enter: Enter) {
+  show('loading');
+  const { rooms } = await myRooms(user.uid);
+  const summaries = (await Promise.all(rooms.map((id) => roomSummary(id, user.uid)))).filter(
+    (r): r is RoomSummary => !!r,
+  );
+  const list = $('#room-list');
+  list.replaceChildren(
+    ...(summaries.length
+      ? summaries.map((r) => {
+          const li = document.createElement('li');
+          const b = document.createElement('button');
+          b.className = 'room';
+          const title = document.createElement('b');
+          title.textContent = r.name || t('room_default');
+          const meta = document.createElement('small');
+          meta.textContent = `${r.partner ? `♥ ${r.partner}` : t('room_alone')} · ${t('level', { n: r.level })}`;
+          b.append(title, meta);
+          if (r.test) {
+            const badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = t('test_badge');
+            b.append(badge);
+          }
+          b.onclick = () => void enter(r.id, user.uid).catch(error);
+          li.append(b);
+          return li;
+        })
+      : [Object.assign(document.createElement('li'), { className: 'muted', textContent: t('rooms_empty') })]),
+  );
+  show('rooms');
+  $('#new-room').onclick = () => show('create');
+  $('#back-rooms').onclick = () => show('rooms');
+}
+
+function setupCreate(user: User, enter: Enter) {
   let look: Look = 'phu';
   for (const b of document.querySelectorAll<HTMLButtonElement>('#looks button')) {
-    drawAvatar(b.querySelector('canvas')!, b.dataset.look as Look);
+    const cv = b.querySelector('canvas')!;
+    void renderIcon(b.dataset.look as Look).then(
+      (img) => img && cv.getContext('2d')!.drawImage(img, 0, 0, cv.width, cv.height),
+    );
     b.onclick = () => {
       look = b.dataset.look as Look;
       document.querySelectorAll('#looks button').forEach((x) => x.classList.toggle('on', x === b));
     };
   }
+  $<HTMLInputElement>('#room-name').placeholder = t('room_name_ph');
   $('#create').onclick = async () => {
     try {
       $('#create').setAttribute('disabled', '');
-      const worldId = await createWorld(user.uid, { name: displayName(user), look });
+      const name = $<HTMLInputElement>('#room-name').value;
+      const test = $<HTMLInputElement>('#room-test').checked;
+      const worldId = await createWorld(user.uid, { name: displayName(user), look }, name, test);
       const code = await createInvite(worldId, user.uid, look === 'phu' ? 'su' : 'phu');
-      const store = await SharedStore.open(worldId, user.uid);
-      showInvite(code, () => {
-        $('#lobby').hidden = true;
-        resolve({ store, isNew: true });
-      });
+      showInvite(code, () => void enter(worldId, user.uid, true));
     } catch (e) {
       $('#create').removeAttribute('disabled');
       error(e);
@@ -160,10 +227,7 @@ function setupCreate(user: User, resolve: (r: LobbyResult) => void) {
     const raw = $<HTMLInputElement>('#join-code').value.trim();
     const code = /join=([a-z2-9]+)/.exec(raw)?.[1] ?? raw;
     try {
-      const worldId = await joinWithInvite(code, user.uid, displayName(user));
-      const store = await SharedStore.open(worldId, user.uid);
-      $('#lobby').hidden = true;
-      resolve({ store, isNew: false });
+      await enter(await joinWithInvite(code, user.uid, displayName(user)), user.uid);
     } catch (e) {
       error(e);
     }

@@ -186,6 +186,17 @@ const vi = {
   invite_invalid: 'Link mời không hợp lệ hoặc đã dùng rồi',
   sync_error: 'Mất kết nối, thử lại nhé',
   retry: 'Thử lại',
+  rooms_title: 'Các khu vườn của bạn',
+  rooms_empty: 'Chưa có khu vườn nào — tạo mới hoặc dán link mời nhé',
+  room_default: 'Vườn không tên',
+  room_alone: 'Đang chờ người ấy',
+  room_name_ph: 'Tên khu vườn (vd. Vườn của Phú & Su)',
+  test_room: 'Phòng thử nghiệm 🧪',
+  test_badge: '🧪 Thử nghiệm',
+  back_rooms: '← Danh sách vườn',
+  switch_room: 'Đổi khu vườn',
+  fatal_load: 'Không tải được khu vườn. Kiểm tra mạng rồi thử lại nhé.',
+  fatal_webgl: 'Trình duyệt này chưa hỗ trợ đồ hoạ 3D (WebGL). Hãy thử Chrome hoặc Safari mới.',
 };
 
 const en: Record<keyof typeof vi, string> = {
@@ -373,6 +384,17 @@ const en: Record<keyof typeof vi, string> = {
   invite_invalid: 'This invite link is invalid or already used',
   sync_error: 'Connection lost, try again',
   retry: 'Try again',
+  rooms_title: 'Your gardens',
+  rooms_empty: 'No gardens yet — create one or paste an invite link',
+  room_default: 'Unnamed garden',
+  room_alone: 'Waiting for your partner',
+  room_name_ph: 'Garden name (e.g. Our little garden)',
+  test_room: 'Test room 🧪',
+  test_badge: '🧪 Test',
+  back_rooms: '← Garden list',
+  switch_room: 'Switch garden',
+  fatal_load: 'The garden couldn’t load. Check your connection and try again.',
+  fatal_webgl: 'This browser can’t show 3D (WebGL). Try a recent Chrome or Safari.',
 };
 
 export type MsgKey = keyof typeof vi;
