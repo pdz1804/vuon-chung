@@ -14,6 +14,7 @@ export default defineConfig({
   timeout: CI ? 120_000 : 60_000,
   workers: CI ? 1 : undefined,
   retries: CI ? 1 : 0,
+  expect: { timeout: CI ? 15_000 : 5_000 },
   reporter: CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: { baseURL: 'http://localhost:5240', trace: 'retain-on-failure' },
   webServer: { command: 'npm run dev', url: 'http://localhost:5240', reuseExistingServer: true },

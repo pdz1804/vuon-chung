@@ -36,7 +36,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   const b = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
 
   // Alice creates the garden and gets an invite link.
-  await a.goto('/?emu=1#qa');
+  await a.goto('/?emu=1&norender=1#qa');
   await signIn(a, 'alice');
   await a.locator('#new-room').click();
   await a.locator('#looks button[data-look="su"]').click();
@@ -49,7 +49,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
 
   // Bob opens the link, signs in, and lands in the same garden.
   const url = new URL(link);
-  await b.goto(`/?join=${url.searchParams.get('join')}&emu=1#qa`);
+  await b.goto(`/?join=${url.searchParams.get('join')}&emu=1&norender=1#qa`);
   await signIn(b, 'bob');
   await b.waitForFunction(() => window.__qa);
 
@@ -97,7 +97,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
 
   // An invite can't be reused by a third person.
   const c = await (await browser.newContext({ baseURL: 'http://localhost:5240' })).newPage();
-  await c.goto(`/?join=${url.searchParams.get('join')}&emu=1`);
+  await c.goto(`/?join=${url.searchParams.get('join')}&emu=1&norender=1`);
   await signIn(c, 'carol');
   await expect(c.locator('#lobby-error')).not.toBeEmpty();
 });
@@ -108,7 +108,7 @@ test('a player can belong to several gardens and switch between them', async ({ 
   const b = await (await browser.newContext(ctx)).newPage();
 
   // Bob starts a garden of his own first, marked as a test room.
-  await b.goto('/?emu=1#qa');
+  await b.goto('/?emu=1&norender=1#qa');
   await signIn(b, 'bob2');
   await b.locator('#new-room').click();
   await b.locator('#room-name').fill('Bob solo');
@@ -117,7 +117,7 @@ test('a player can belong to several gardens and switch between them', async ({ 
   await b.locator('#enter').click();
   await b.waitForFunction(() => window.__qa);
 
-  await a.goto('/?emu=1#qa');
+  await a.goto('/?emu=1&norender=1#qa');
   await signIn(a, 'alice2');
   await a.locator('#new-room').click();
   await a.locator('#room-name').fill('Vườn của hai đứa');
@@ -128,7 +128,7 @@ test('a player can belong to several gardens and switch between them', async ({ 
   await a.waitForFunction(() => window.__qa);
 
   // Bob joins Alice's garden: it is added, his own garden stays.
-  await b.goto(`/?join=${code}&emu=1#qa`);
+  await b.goto(`/?join=${code}&emu=1&norender=1#qa`);
   await b.waitForFunction(() => window.__qa);
   await a.waitForFunction(() => window.__qa.partners.size() === 1);
 

@@ -16,6 +16,8 @@ import { FIELD, MAP_H, MAP_W, PEN, PROPS, SPAWN, buildGround, isBlocked, type Gr
 const SPEED = 4.4; // tiles per second
 const RADIUS = 0.28; // farmer collision radius, tiles
 const COARSE = matchMedia('(pointer: coarse)').matches;
+/** Test switch: run the game loop but skip drawing (networking tests on GPU-less CI). */
+const NO_RENDER = new URLSearchParams(location.search).has('norender');
 
 const AVATAR: Record<Look, string> = { phu: 'chars/character-male-a', su: 'chars/character-female-a' };
 const ANIMAL_MODEL = { chicken: 'pets/animal-chick', duck: 'pets/animal-chick', cow: 'pets/animal-cow' } as const;
@@ -618,7 +620,8 @@ export class Farm3DView implements FarmView {
     for (const plot of this.plots.values()) {
       if (plot.sparkle) plot.sparkle.position.y = 0.75 + Math.sin(t / 300 + plot.soil.position.x) * 0.06;
     }
-    this.renderer.render(this.scene, this.camera);
+    // Labels are DOM (name tags, emotes) and stay on even when WebGL drawing is off.
+    if (!NO_RENDER) this.renderer.render(this.scene, this.camera);
     this.labels.render(this.scene, this.camera);
   }
 
