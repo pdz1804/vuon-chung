@@ -11,7 +11,10 @@ export default tseslint.config(
     extends: [...tseslint.configs.recommendedTypeChecked],
     languageOptions: {
       globals: globals.browser,
-      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+      parserOptions: {
+        projectService: { allowDefaultProject: ['src/sw.ts'], defaultProject: 'tsconfig.sw.json' },
+        tsconfigRootDir: import.meta.dirname,
+      },
     },
   },
   {

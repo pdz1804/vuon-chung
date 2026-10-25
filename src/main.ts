@@ -7,6 +7,20 @@ import { Presence } from './net/presence';
 import { LocalStore } from './net/world-store';
 import { Hud, setIconSource } from './ui/hud';
 import { inviteFromGame, runLobby } from './ui/lobby';
+import { registerSW } from 'virtual:pwa-register';
+
+// Installable app: the worker caches the shell and models. A new version waits until
+// the player taps "Update" so a refresh never interrupts play.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  const update = registerSW({
+    onNeedRefresh() {
+      const b = document.querySelector<HTMLButtonElement>('#update')!;
+      b.textContent = t('update_ready');
+      b.hidden = false;
+      b.onclick = () => void update(true);
+    },
+  });
+}
 
 // Solo mode: the fast dev clock or ?local=1 play offline against localStorage.
 const LOCAL = DEV || new URLSearchParams(location.search).has('local');
