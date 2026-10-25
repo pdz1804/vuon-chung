@@ -45,7 +45,11 @@ function error(e: unknown) {
   const code = e instanceof Error ? e.message : String(e);
   console.error(e);
   $('#lobby-error').textContent = t(
-    code.includes('invite') || code.includes('permission') ? 'invite_invalid' : 'sync_error',
+    code === 'invite_own'
+      ? 'invite_own'
+      : code.includes('invite') || code.includes('permission')
+        ? 'invite_invalid'
+        : 'sync_error',
   );
 }
 

@@ -243,6 +243,8 @@ export async function joinWithInvite(code: string, uid: string, name: string): P
   const inv = await getDoc(doc(db, 'invites', code));
   const worldId = inv.data()?.worldId as string | undefined;
   if (!worldId) throw new Error('invite_invalid');
+  // The creator opening their own link would be refused by the rules anyway; say why.
+  if (inv.data()?.createdBy === uid) throw new Error('invite_own');
   // The joiner can't read the world yet, so they take the look the creator didn't
   // pick from the invite's hint (stored on the invite by the creator).
   const look: Look = inv.data()?.partnerLook === 'phu' ? 'phu' : 'su';

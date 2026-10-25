@@ -1,6 +1,6 @@
 # Architecture
 
-Vườn Chung is a single-page TypeScript app. Phaser draws the world on a canvas, a thin DOM layer draws the HUD
+Vườn Chung is a single-page TypeScript app. three.js renders the world as a low-poly 3D scene on a canvas, a thin DOM layer draws the HUD
 and dialogs, and every game rule lives in a pure module (`sim`) that knows nothing about either. A `WorldStore`
 applies rules to the farm state, either against `localStorage` (solo) or inside Firestore transactions (shared).
 Player-facing rules are in [game-design.md](./game-design.md).
@@ -9,9 +9,10 @@ Player-facing rules are in [game-design.md](./game-design.md).
 flowchart TB
   subgraph Browser
     main[main.ts<br/>solo or lobby] --> scene
-    subgraph game ["game/ (Phaser)"]
-      scene[FarmScene]
-      tex[textures.ts<br/>procedural sprites]
+    subgraph game ["game/ (three.js)"]
+      scene[GameController]
+      view[view3d.ts<br/>Farm3DView]
+      mdl[models.ts, icons.ts<br/>GLB loader, HUD icons]
       map[world-map.ts<br/>layout data]
     end
     subgraph ui ["ui/ (DOM)"]
@@ -38,7 +39,8 @@ flowchart TB
     scene --> store
     scene --> pres
     scene --> farm
-    scene --> tex
+    scene --> view
+    view --> mdl
     scene --> map
     store --> farm
     store --> save
@@ -54,13 +56,13 @@ flowchart TB
 ```
 
 Dependencies point one way: `sim` imports nothing from the rest of the app (its modules only import each other),
-`ui`, `game` and `net` import `sim`, and `game/farm-scene.ts` wires everything together.
+`ui`, `game` and `net` import `sim`, and `game/controller.ts` wires everything together.
 
 ## Module map
 
 ### `src/sim` (pure rules)
 
-No DOM, no Phaser, no clock, no I/O. Every action receives `now` (a millisecond timestamp) and, where it
+No DOM, no three.js, no clock, no I/O. Every action receives `now` (a millisecond timestamp) and, where it
 matters, the acting player's `uid`, so the same code runs in the browser, in unit tests and inside a Firestore
 transaction. Actions mutate the `FarmState` they are given and return an `ActionResult` whose `msg` is an i18n
 key (`ok: false` carries the refusal reason).
@@ -89,18 +91,22 @@ Each `*.test.ts` next to a module covers it with Vitest (`farm`, `economy`, `ani
 `LocalStore` keeps the farm in `localStorage` through `save.ts` and applies actions directly. `SharedStore`
 mirrors the world document through a snapshot listener and runs each action as a transaction (see
 [Transaction model](#transaction-model)). Both expose `farm`, `profiles`, `members`, `apply(action)` and
-`onChange(cb)`, so the scene does not care which one it has.
+`onChange(cb)`, so the controller does not care which one it has.
 
-### `src/game` (Phaser)
+### `src/game` (three.js)
 
-- `farm-scene.ts`: `FarmScene` builds the map, moves the farmer with arcade physics, and turns the "use" input
-  into the right `sim` action for the tile or prop in front of you. It redraws soil, crops, rain, the night tint
-  and the Memory Tree from state once a second, draws wandering chickens and the partner avatar, shows emote
-  bubbles, applies the walking-together speed boost, pays out the shipping bin when the Vietnam day changes, and
-  autosaves local farms every 15 seconds and on page unload. With `#qa` in the URL it exposes
-  `window.__qa = { scene, farm(), partners }` for tests.
-- `textures.ts`: draws every 16x16 sprite procedurally into canvas textures at boot, so the repo has no image
-  assets.
+- `controller.ts`: `GameController` owns input, timers and actions. It turns the "use" input into the right `sim`
+  action for the tile or prop in front of you, tells the view what to draw once a second (soil, crops, rain, the
+  night tint, the Memory Tree, wandering chickens, the partner avatar, emote bubbles), applies the walking-together
+  speed boost, pays out the shipping bin when the Vietnam day changes, and flushes local farms every 15 seconds
+  and on page unload. It never draws. With `#qa` in the URL it exposes `window.__qa` for tests.
+- `view.ts`: the small `FarmView` interface the controller needs from a renderer, so rules, networking and HUD
+  stay independent of how the farm is drawn.
+- `view3d.ts`: `Farm3DView`, the three.js implementation: a perspective camera, soft shadows, fog, a sun that
+  follows the day and night tint, and the farmer, crops, animals and props placed from the map data.
+- `models.ts`: loads the CC0 Kenney GLB kits from `public/models` once, normalises each to a height in tiles
+  and clones them (skeleton-aware) per use.
+- `icons.ts`: renders the HUD icons from the same 3D models into small canvases.
 - `world-map.ts`: the homestead as plain data (32x22 tiles, props, the fenced field `x 9-22, y 9-16`, spawn
   point, chicken pen).
 
@@ -108,7 +114,7 @@ mirrors the world document through a snapshot listener and runs each action as a
 
 - `hud.ts`: status bar (coins, level, clock and rain icon, bin value, invite pill, language pill), seed hotbar,
   bag, toasts, shop, village board (including the duo row), emote buttons and the touch joystick and Use
-  button. It is DOM rather than canvas so Vietnamese diacritics stay crisp. The scene calls `render(farm,
+  button. It is DOM rather than canvas so Vietnamese diacritics stay crisp. The controller calls `render(farm,
 selected)`; the HUD calls back through the `HudHandlers` interface.
 - `panels.ts`: mailbox, Memory Tree and "while you were away" dialogs. Text from the partner is inserted with
   `textContent`, never as HTML.
@@ -161,7 +167,7 @@ flowchart LR
 ### Shipping bin and payout
 
 `ship` moves produce into the bin and stamps `binDay`. `payout` pays the bin once `vnDay(now)` differs from
-`binDay` and empties it in the same step, so running it twice, or from two clients, cannot pay twice. The scene
+`binDay` and empties it in the same step, so running it twice, or from two clients, cannot pay twice. The controller
 attempts it at most once a minute through a normal store action, so in shared mode it is a transaction.
 
 ## World document and data model
@@ -232,7 +238,7 @@ device clock is wrong. The dev clock ignores the offset.
 
 `Presence` publishes your pose only when it changes, at most every 125 ms (about 8 per second), with a trailing
 send so the resting pose always arrives. After every (re)connect it re-arms `onDisconnect().remove()` and forces a
-fresh publish, because the server removed the node when the link dropped. The partner's sprite eases toward the
+fresh publish, because the server removed the node when the link dropped. The partner's avatar eases toward the
 last reported position; emotes are a field on the same node and are shown once per `et`. Walking together
 (both moving, within 24 px, hysteresis out at 36 px) gives a 1.25x speed boost.
 

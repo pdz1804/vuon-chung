@@ -4,14 +4,14 @@
 
 **Một khu vườn nhỏ ấm áp để hai người cùng chăm — trồng, tưới, thu hoạch, và vườn vẫn lớn khi bạn ngoài đời.**
 
-**A cozy pixel-art garden for two — plant, water, harvest, and the garden keeps growing while you are away.**
+**A cozy low-poly 3D garden for two — plant, water, harvest, and the garden keeps growing while you are away.**
 
 [![CI](https://github.com/pdz1804/vuon-chung/actions/workflows/ci.yml/badge.svg)](https://github.com/pdz1804/vuon-chung/actions/workflows/ci.yml)
 [![Deploy](https://github.com/pdz1804/vuon-chung/actions/workflows/deploy.yml/badge.svg)](https://github.com/pdz1804/vuon-chung/actions/workflows/deploy.yml)
 [![CodeQL](https://github.com/pdz1804/vuon-chung/actions/workflows/codeql.yml/badge.svg)](https://github.com/pdz1804/vuon-chung/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Phaser](https://img.shields.io/badge/Phaser-3.88-8b5cf6)](https://phaser.io/)
+[![three.js](https://img.shields.io/badge/three.js-0.170-000000?logo=threedotjs&logoColor=white)](https://threejs.org/)
 
 ### [▶ Play it: vuon-chung.web.app](https://vuon-chung.web.app)
 
@@ -51,7 +51,8 @@
   partner walk around live, send emotes and walk together for a small speed boost.
 - **Vietnamese and English** UI, switchable in-game.
 - **Desktop and phone**: keyboard controls, or an on-screen joystick and Use button on touch devices.
-- **Crisp pixel art**, drawn procedurally at startup, so there are no image assets to download.
+- **Low-poly 3D garden** rendered with three.js from CC0 Kenney GLB models, with a "storybook field journal" HUD.
+- **Many gardens**: one account can belong to several rooms (two members each), plus optional test rooms.
 
 ## Play it
 
@@ -106,7 +107,7 @@ and chicken moods are computed from timestamps and the Vietnam calendar date whe
 ```mermaid
 flowchart LR
   subgraph Client ["Browser (per player)"]
-    UI["Phaser scene + DOM HUD"] -->|"action(state, now, uid)"| STORE["WorldStore"]
+    UI["three.js view + DOM HUD"] -->|"action(state, now, uid)"| STORE["WorldStore"]
     STORE -->|"state"| UI
     STORE --> SIM["sim/*<br/>pure rules"]
     UI --> PRES["Presence"]
@@ -126,7 +127,7 @@ data model, security rules and deploy pipeline.
 
 | Area      | Choice                                                                          |
 | --------- | ------------------------------------------------------------------------------- |
-| Game      | [Phaser 3](https://phaser.io/) (arcade physics, pixel-art rendering)            |
+| Game      | [three.js](https://threejs.org/) low-poly 3D (CC0 Kenney GLB models)            |
 | Language  | TypeScript 5.8 (strict)                                                         |
 | Backend   | Firebase: Auth (Google), Firestore (named database), Realtime Database, Hosting |
 | Tooling   | Vite 6, Node 24                                                                 |
@@ -143,12 +144,12 @@ vuon-chung/
 ├── src/
 │   ├── sim/            Pure game rules: growth, farm, weather, orders, animals, couple layer (+ unit tests)
 │   ├── net/            Firebase wiring, WorldStore (local and shared), live presence
-│   ├── game/           Phaser scene, procedural textures, world map
+│   ├── game/           three.js view, GLB models, controller, world map
 │   ├── ui/             DOM overlay: HUD, lobby, mailbox and Memory Tree panels
 │   ├── clock.ts        Game clock and the ?speed= dev clock
 │   ├── save.ts         Local save (localStorage)
 │   ├── i18n.ts         Vietnamese and English strings
-│   └── main.ts         Bootstrap: solo or lobby, then the Phaser game
+│   └── main.ts         Bootstrap: solo or lobby, then the game
 ├── tests/
 │   ├── e2e/            Playwright specs (solo loop, two-player)
 │   └── rules/          Firestore security-rules tests (emulator)
@@ -156,7 +157,7 @@ vuon-chung/
 ├── database.rules.json Realtime Database rules (presence)
 ├── docs/               Architecture, game design and media
 ├── .github/            CI, deploy, CodeQL, dependency review, secret scan, templates
-└── public/             Static assets (favicon)
+└── public/             Static assets (favicon, CC0 GLB models in `public/models`)
 ```
 
 ## Roadmap
@@ -220,6 +221,9 @@ Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 ## License
 
 [MIT](LICENSE) © 2026 Nguyen Quang Phu
+
+3D models are CC0 kits by [Kenney](https://www.kenney.nl/) (Nature Kit, Fantasy Town Kit, Food Kit, Survival Kit,
+Mini Characters, Cube Pets); the licence files ship in `public/models`.
 
 ---
 
