@@ -1193,3 +1193,24 @@ body {
 #ui [hidden] {
   display: none !important;
 }
+
+/* Form submit buttons share the primary style; secondary ones stay outlined. */
+#mail-form button,
+#tree-form button,
+#join button,
+#copy {
+  border: 1px solid var(--leaf);
+  background: var(--leaf);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: none;
+  font: 600 14px var(--font);
+  min-height: 40px;
+}
+/* The lobby covers the game, so the top bar loses its empty paper strip there. */
+body:has(#lobby:not([hidden])) #status {
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
