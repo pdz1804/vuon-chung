@@ -3,6 +3,7 @@
 import { t } from '../i18n';
 
 const DONE_KEY = 'vuon-chung:tutorial:v1:complete';
+const STEP_KEY = 'vuon-chung:tutorial:v1:step';
 /** Each step lists the action results (ActionResult.msg) that complete it. */
 const STEPS: Array<{ key: string; done: string[] }> = [
   { key: 'tut.move', done: ['moved'] },
@@ -12,6 +13,22 @@ const STEPS: Array<{ key: string; done: string[] }> = [
   { key: 'tut.harvest', done: ['harvested'] },
   { key: 'tut.ship', done: ['shipped'] },
 ];
+
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function write(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Private mode: progress just isn't remembered.
+  }
+}
 
 function stored(): boolean {
   try {
@@ -27,8 +44,9 @@ export class Tutorial {
 
   /** Starts the tour if this device hasn't finished it and the garden is brand new. */
   start(gardenXp: number) {
-    if (stored() || gardenXp > 0) return;
-    this.step = 0;
+    // A tour already under way resumes even after the first harvest gave the garden XP.
+    if (stored() || (gardenXp > 0 && read(STEP_KEY) === null)) return;
+    this.step = Math.min(Number(read(STEP_KEY)) || 0, STEPS.length - 1);
     this.el.querySelector('button')!.addEventListener('click', () => this.finish());
     const moved = () => this.notify('moved');
     window.addEventListener('keydown', (e) => {
@@ -38,13 +56,15 @@ export class Tutorial {
     this.render();
   }
 
-  /** Feed every action result here; the current step advances when it matches. */
+  /** Feed every action result here. A player who does a later step early skips ahead. */
   notify(msg: string) {
-    const cur = STEPS[this.step];
-    if (!cur || !cur.done.includes(msg)) return;
-    this.step++;
-    if (this.step >= STEPS.length) this.finish();
-    else this.render();
+    if (this.step < 0 || this.step >= STEPS.length) return;
+    const hit = STEPS.findIndex((st, i) => i >= this.step && st.done.includes(msg));
+    if (hit < 0) return;
+    this.step = hit + 1;
+    if (this.step >= STEPS.length) return this.finish();
+    write(STEP_KEY, String(this.step));
+    this.render();
   }
 
   /** Re-renders the text after a language switch. */
@@ -60,10 +80,6 @@ export class Tutorial {
   private finish() {
     this.step = STEPS.length;
     this.el.hidden = true;
-    try {
-      localStorage.setItem(DONE_KEY, '1');
-    } catch {
-      // Private mode: the tour simply may show again next visit.
-    }
+    write(DONE_KEY, '1');
   }
 }

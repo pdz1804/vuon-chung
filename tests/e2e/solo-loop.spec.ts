@@ -234,3 +234,15 @@ test('first-time tutorial advances with play and stays skipped after a reload', 
   await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
   await expect(coach).toBeHidden();
 });
+
+test('tutorial skips ahead when a later step is done first and resumes after a reload', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
+  await standFacing(page, 10, 10);
+  await page.keyboard.press('Space'); // till without walking first
+  await expect(page.locator('#coach small')).toHaveText('3/6');
+  await page.reload();
+  await expect(page.locator('#coach small')).toHaveText('3/6');
+});
