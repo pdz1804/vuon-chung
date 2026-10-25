@@ -30,7 +30,7 @@ describe('weather', () => {
   });
 
   it('rain hydrates a planted crop, so watering is not needed', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     plant(s, 1, 1, 'rau_muong', RAINY_MIDNIGHT + HOUR);
     expect(plotState(s.plots['1,1'], RAINY_MIDNIGHT + 5 * HOUR)).toBe('needs_water');
@@ -50,7 +50,7 @@ describe('progression', () => {
   });
 
   it('locks roses until level 3', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     s.coins = 1000;
     expect(buySeeds(s, 'rose').msg).toBe('locked');
     s.xp = 300;
@@ -68,7 +68,7 @@ describe('orders', () => {
   });
 
   it('pays once per order per day and takes lowest quality first', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(fulfill(s, 0, DRY).msg).toBe('locked_orders');
     s.xp = 100;
     const o = ordersFor(vnDay(DRY), s.xp)[0];
@@ -104,7 +104,7 @@ describe('migrate', () => {
 
 describe('verifier regressions', () => {
   it("keeps today's board stable when XP crosses an unlock", () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     s.xp = 290;
     const before = boardFor(s, DRY);
     const o = before[0];
@@ -121,7 +121,7 @@ describe('verifier regressions', () => {
   });
 
   it('keeps the morning rain when a regrowing crop is harvested on a rain day', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     plant(s, 1, 1, 'strawberry', RAINY_MIDNIGHT - 30 * HOUR);
     water(s, 1, 1, RAINY_MIDNIGHT - 30 * HOUR);

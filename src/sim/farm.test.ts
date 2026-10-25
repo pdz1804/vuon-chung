@@ -53,7 +53,7 @@ describe('growth', () => {
 
 describe('farm actions', () => {
   it('runs the full loop: till, plant, water, harvest, ship, payout', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(till(s, 3, 3).ok).toBe(true);
     expect(plant(s, 3, 3, 'rau_muong', T0).ok).toBe(true);
     expect(plotState(s.plots['3,3'], T0)).toBe('needs_water');
@@ -77,7 +77,7 @@ describe('farm actions', () => {
   });
 
   it('keeps regrowing plants and restarts their clock', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     plant(s, 1, 1, 'strawberry', T0);
     water(s, 1, 1, T0);
@@ -89,7 +89,7 @@ describe('farm actions', () => {
   });
 
   it('refuses invalid actions with a reason', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(plant(s, 0, 0, 'rau_muong', T0).msg).toBe('not_tilled');
     till(s, 0, 0);
     expect(plant(s, 0, 0, 'sunflower', T0).msg).toBe('no_seeds');
@@ -102,12 +102,36 @@ describe('farm actions', () => {
 
 describe('useTile', () => {
   it('walks a tile through till, plant, water, growing, harvest', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('tilled');
     expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('planted');
     expect(useTile(s, 2, 2, 'rau_muong', T0).msg).toBe('watered');
     const g = useTile(s, 2, 2, 'rau_muong', T0 + 2 * HOUR);
     expect(g).toMatchObject({ ok: false, msg: 'growing', vars: { pct: 50 } });
     expect(useTile(s, 2, 2, 'rau_muong', T0 + 4 * HOUR).msg).toBe('harvested');
+  });
+});
+
+describe('fast first crop', () => {
+  it('a brand-new garden harvests its first crop after 10 minutes of water', () => {
+    const s = newFarm();
+    till(s, 2, 2);
+    plant(s, 2, 2, 'rau_muong', T0);
+    water(s, 2, 2, T0);
+    expect(plotState(s.plots['2,2'], T0 + 9 * 60_000)).toBe('growing');
+    expect(harvest(s, 2, 2, T0 + 10 * 60_000).ok).toBe(true);
+  });
+
+  it('only the first crop is fast, and older gardens never get one', () => {
+    const s = newFarm();
+    till(s, 2, 2);
+    till(s, 3, 2);
+    plant(s, 2, 2, 'rau_muong', T0);
+    plant(s, 3, 2, 'rau_muong', T0);
+    expect(s.plots['3,2'].crop?.quick).toBeUndefined();
+    const old = { ...newFarm(), xp: 40 };
+    till(old, 2, 2);
+    plant(old, 2, 2, 'rau_muong', T0);
+    expect(old.plots['2,2'].crop?.quick).toBeUndefined();
   });
 });

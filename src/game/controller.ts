@@ -15,6 +15,8 @@ import { rainingAt } from '../sim/weather';
 import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, drawIcon } from '../ui/hud';
 import { Panels } from '../ui/panels';
+import { Tutorial } from '../ui/tutorial';
+import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../audio/sound';
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
 import { isFieldTile, propAt } from './world-map';
 
@@ -23,6 +25,23 @@ const TOGETHER_BOOST = 1.25;
 /** The only emotes the game sends or shows. */
 export const EMOTES = ['❤️', '👋', '🌱', '😂'];
 const CHICK_NAMES = ['Bông', 'Mít', 'Xôi', 'Na', 'Mochi', 'Bắp', 'Sữa', 'Kem'];
+/** Which sound each successful action makes; anything unlisted gets a soft click. */
+const SFX_FOR: Record<string, Sfx> = {
+  tilled: 'till',
+  planted: 'plant',
+  watered: 'water',
+  watered_both: 'water',
+  harvested: 'harvest',
+  shipped: 'coin',
+  payout: 'coin',
+  egg_collected: 'animal',
+  feeder_filled: 'animal',
+  animal_bought: 'animal',
+  order_done: 'coin',
+  duo_done: 'levelup',
+  cooked: 'harvest',
+  letter_sent: 'letter',
+};
 const SHORT: Record<Facing, Pose['f']> = { down: 'd', up: 'u', left: 'l', right: 'r' };
 
 export interface GameBoot {
@@ -43,6 +62,7 @@ export class GameController {
   private selected: SpeciesId = 'rau_muong';
   private busy = false;
   private level = 0;
+  private readonly tutorial = new Tutorial();
   private unread = 0;
   private ranks = new Map<string, number>();
   private lastPayoutTry = 0;
@@ -68,6 +88,11 @@ export class GameController {
     this.store.onChange(() => this.refresh());
     this.refresh();
     if (this.boot.isNew) this.hud.toast(t('welcome'));
+    this.tutorial.start(this.store.farm.xp);
+    // Browsers only allow sound after a gesture, so the first one switches audio on.
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
     this.showAwaySummary();
 
     this.view.onFrame((dt) => this.frame(dt));
@@ -118,7 +143,19 @@ export class GameController {
     window.addEventListener('blur', () => this.keys.clear());
   }
 
+  /** Speaker button in the top bar; the choice is remembered on this device. */
+  private labelMute() {
+    const b = document.querySelector<HTMLButtonElement>('#mute')!;
+    b.textContent = isMuted() ? '🔇' : '🔊';
+    b.title = b.ariaLabel = t(isMuted() ? 'sound_off' : 'sound_on');
+  }
+
   private bindUi() {
+    this.labelMute();
+    document.querySelector('#mute')!.addEventListener('click', () => {
+      setMuted(!isMuted());
+      this.labelMute();
+    });
     this.panels = new Panels({
       sendLetter: async (text) => (await this.run((s, ts, uid) => sendLetter(s, uid, text, ts)))?.ok ?? false,
       readLetters: () => void this.store.apply((s, _, uid) => readLetters(s, uid)).catch(console.error),
@@ -136,7 +173,11 @@ export class GameController {
       onBuyAnimal: (species) =>
         void this.run((s, ts) => buyAnimal(s, species, CHICK_NAMES[s.animals.length % CHICK_NAMES.length], ts)),
       onEmote: (e) => this.emote(e),
-      onLangChange: () => this.refresh(),
+      onLangChange: () => {
+        this.refresh();
+        this.tutorial.render();
+        this.labelMute();
+      },
     });
   }
 
@@ -233,6 +274,8 @@ export class GameController {
     try {
       const r = await this.store.apply(action);
       this.hud.toast(t(r.msg, r.vars));
+      playSfx(r.ok ? (SFX_FOR[r.msg] ?? 'click') : 'error');
+      if (r.ok) this.tutorial.notify(r.msg);
       if (r.ok) {
         if (animate) this.view.playAction();
         this.refresh();
@@ -261,6 +304,7 @@ export class GameController {
     if (this.level && lv > this.level) {
       const unlocks: string[] = [];
       for (let l = this.level + 1; l <= lv; l++) unlocks.push(...(UNLOCKS[l] ?? []).map((u) => t(`unlock.${u}`)));
+      playSfx('levelup');
       this.hud.toast(t('level_up', { n: lv }) + (unlocks.length ? ` · ${unlocks.join(' · ')}` : ''));
       this.view.celebrate();
     }
@@ -275,7 +319,10 @@ export class GameController {
     this.syncRoles();
     this.hud.showEmotes(this.store.members.length >= 2);
     const unread = unreadFor(farm, this.store.uid);
-    if (unread > this.unread) this.hud.toast(t('new_letter'));
+    if (unread > this.unread) {
+      this.hud.toast(t('new_letter'));
+      playSfx('letter');
+    }
     this.unread = unread;
     this.tick();
   }
@@ -309,6 +356,7 @@ export class GameController {
     const dark = h >= 19 || h < 5 ? 1 : h >= 17 ? (h - 17) / 2 : h < 7 ? (7 - h) / 2 : 0;
     const raining = rainingAt(ts);
     this.view.setEnvironment(dark, raining);
+    setNight(dark > 0.5);
     const clock = `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
     if (clock !== this.lastClock || raining !== this.wasRaining) this.hud.setClock((this.lastClock = clock), raining);
     if (raining !== this.wasRaining) {

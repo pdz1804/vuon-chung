@@ -17,6 +17,8 @@ export interface Crop extends CropTimes {
   harvests: number;
   /** Vietnam day → uids who cared for it that day ("both hands" bonus). */
   care?: Record<string, string[]>;
+  /** A brand-new garden's first crop grows fast so the first harvest comes in one sitting. */
+  quick?: boolean;
 }
 
 export interface Plot {
@@ -48,6 +50,8 @@ export interface FarmState {
   duo?: { day: string; by: string[]; xp: number };
   /** Per-player role and rank progress, keyed by uid. */
   players: Record<string, PlayerState>;
+  /** Set once the garden's fast first crop has been planted. */
+  firstCropUsed?: boolean;
 }
 
 export type ActionResult =
@@ -81,8 +85,11 @@ export function vnDay(ts: number): string {
 
 export const key = (x: number, y: number) => `${x},${y}`;
 
+export const QUICK_GROW_MS = 10 * 60_000;
+
 function growMsFor(crop: Crop): number {
   const sp = SPECIES[crop.species];
+  if (crop.quick && crop.harvests === 0) return Math.min(QUICK_GROW_MS, sp.growMs);
   return crop.harvests > 0 && sp.regrowMs ? sp.regrowMs : sp.growMs;
 }
 
@@ -128,6 +135,10 @@ export function plant(
   if (!s.seeds[species]) return { ok: false, msg: 'no_seeds', vars: { species } };
   s.seeds[species] -= 1;
   plot.crop = { species, plantedAt: now, waterings: [], harvests: 0 };
+  // Only a garden that has never earned XP gets the fast first crop, so older gardens
+  // are unaffected. The flag lives in the shared farm, so both players see one timer.
+  if (!s.firstCropUsed && s.xp === 0) plot.crop.quick = true;
+  s.firstCropUsed = true;
   markCare(plot.crop, uid, now);
   return { ok: true, msg: 'planted', vars: { species } };
 }

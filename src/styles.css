@@ -1214,3 +1214,48 @@ body:has(#lobby:not([hidden])) #status {
   box-shadow: none;
   backdrop-filter: none;
 }
+
+/* First-time coach card, floating above the dock. */
+#coach {
+  position: absolute;
+  left: 50%;
+  bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--sun, #e8b84a);
+  border-radius: 12px;
+  box-shadow: var(--raised);
+  animation: sheet-up 0.25s ease-out;
+}
+#coach small {
+  grid-column: 1 / -1;
+  color: var(--muted-ink);
+  font-weight: 600;
+  font-size: 12px;
+}
+#coach p {
+  margin: 0;
+  font: 500 14px var(--font);
+}
+#coach button {
+  border: 1px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 12px;
+  min-height: 36px;
+  font: 600 13px var(--font);
+  color: var(--muted-ink);
+  cursor: pointer;
+}
+@media (pointer: coarse) {
+  #coach {
+    bottom: calc(250px + env(safe-area-inset-bottom, 0px));
+  }
+}

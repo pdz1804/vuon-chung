@@ -218,3 +218,19 @@ test('dialog buttons work from the keyboard', async ({ page, isMobile }) => {
   await page.keyboard.press('Enter');
   await expect(page.locator('#shop')).toBeHidden();
 });
+
+test('first-time tutorial advances with play and stays skipped after a reload', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  const coach = page.locator('#coach');
+  await expect(coach).toBeVisible();
+  await expect(coach.locator('small')).toHaveText('1/6');
+  await page.keyboard.press('ArrowLeft');
+  await expect(coach.locator('small')).toHaveText('2/6');
+  await coach.locator('button').click();
+  await expect(coach).toBeHidden();
+  await page.reload();
+  await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
+  await expect(coach).toBeHidden();
+});

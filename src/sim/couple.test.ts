@@ -17,7 +17,7 @@ const T0 = Date.UTC(2026, 9, 20, 1, 0); // 20 Oct 08:00 VN, a dry day
 
 describe('both hands', () => {
   it('gives the third star when both partners care on the same day, hours apart', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     plant(s, 1, 1, 'rau_muong', T0, 'phu');
     water(s, 1, 1, T0, 'phu');
@@ -29,7 +29,7 @@ describe('both hands', () => {
   });
 
   it('does not count care on different days', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     s.seeds.sunflower = 1;
     plant(s, 1, 1, 'sunflower', T0, 'phu');
@@ -40,7 +40,7 @@ describe('both hands', () => {
   });
 
   it('tending twice the same day by the same person does nothing', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     plant(s, 1, 1, 'rau_muong', T0, 'phu');
     water(s, 1, 1, T0, 'phu');
@@ -50,7 +50,7 @@ describe('both hands', () => {
 
 describe('letters', () => {
   it('sends, counts unread for the partner only, and marks read', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(sendLetter(s, 'phu', '   ', T0).msg).toBe('letter_empty');
     sendLetter(s, 'phu', 'Chào em 🌱', T0);
     expect(unreadFor(s, 'su')).toBe(1);
@@ -64,7 +64,7 @@ describe('letters', () => {
 
 describe('memories', () => {
   it('grows the tree, sorts by date and gives XP', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(addMemory(s, 'phu', 'nope', 'x', T0).msg).toBe('memory_date');
     expect(treeStage(s)).toBe(0);
     addMemory(s, 'phu', '2024-02-14', 'Lần đầu gặp nhau', T0);
@@ -77,7 +77,7 @@ describe('memories', () => {
 
 describe('away summary', () => {
   it("counts only the partner's events since you left", () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     logEvent(s, { t: T0, uid: 'su', msg: 'harvested' });
     logEvent(s, { t: T0 + 1, uid: 'su', msg: 'harvested' });
     logEvent(s, { t: T0 + 2, uid: 'phu', msg: 'shipped' });
@@ -88,7 +88,7 @@ describe('away summary', () => {
 
 describe('verifier regressions', () => {
   it('only says "both hands" when both cared today', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     till(s, 1, 1);
     s.seeds.sunflower = 1;
     plant(s, 1, 1, 'sunflower', T0, 'phu');
@@ -99,7 +99,7 @@ describe('verifier regressions', () => {
   });
 
   it('rejects impossible dates and caps memories', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     expect(addMemory(s, 'phu', '2026-13-45', 'x', T0).msg).toBe('memory_date');
     s.memories = Array.from({ length: 400 }, (_, i) => ({
       id: String(i),
@@ -112,7 +112,7 @@ describe('verifier regressions', () => {
   });
 
   it('never splits an emoji when trimming a long letter', () => {
-    const s = newFarm();
+    const s = { ...newFarm(), firstCropUsed: true }; // an established garden: normal growth times
     sendLetter(s, 'phu', '🌱'.repeat(LETTER_MAX + 5), T0);
     expect(Array.from(s.letters[0].text)).toHaveLength(LETTER_MAX);
     expect(s.letters[0].text.endsWith('🌱')).toBe(true);
