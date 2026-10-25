@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
 
 :root {
   --leaf: #2f7d4f;
@@ -900,4 +900,296 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Storybook field-journal theme: warm paper surfaces, ink text, one green accent.
+   Layered last so it restyles every component above without changing layout. */
+:root {
+  --paper: #fff8e8;
+  --paper-strong: #f5e7cc;
+  --ink: #3f3226;
+  --muted-ink: #74685a;
+  --leaf: #477a4a;
+  --leaf-dark: #2e5b35;
+  --line: #d5bf99;
+  --wood: #8a6a45;
+  --wood-light: #d5bf99;
+  --shadow: 0 2px 8px rgba(63, 50, 38, 0.12);
+  --raised: 0 8px 24px rgba(63, 50, 38, 0.18);
+  --font: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+  --display: 'Fraunces', Georgia, serif;
+}
+body {
+  line-height: 1.4;
+}
+#ui :focus-visible {
+  outline: 2px solid var(--leaf-dark);
+  outline-offset: 2px;
+}
+
+/* Top bar: one paper strip of stats and actions */
+#status {
+  margin: calc(10px + env(safe-area-inset-top, 0px)) 12px 0;
+  padding: 6px 8px;
+  min-height: 52px;
+  background: rgba(255, 248, 232, 0.92);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.pill {
+  border: 0;
+  box-shadow: none;
+  background: var(--paper-strong);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: 600 14px var(--font);
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pill.btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  transition: background 0.15s ease-out;
+}
+.pill.btn:hover {
+  background: var(--paper-strong);
+}
+#status .invite {
+  background: var(--leaf);
+  color: #fff;
+  border-color: var(--leaf);
+}
+#xp i {
+  background: var(--leaf);
+}
+
+/* Toast: paper card with a green rail */
+#toast {
+  background: var(--paper);
+  color: var(--ink);
+  border-left: 4px solid var(--leaf);
+  box-shadow: var(--raised);
+  border-radius: 10px;
+  font: 500 14px var(--font);
+  top: calc(76px + env(safe-area-inset-top, 0px));
+}
+
+/* Dock */
+#bag > * {
+  background: rgba(255, 248, 232, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-weight: 500;
+}
+#hotbar {
+  background: rgba(255, 248, 232, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--raised);
+  padding: 8px;
+  gap: 8px;
+}
+.slot {
+  border: 1px solid var(--line);
+  background: #fffdf6;
+  border-radius: 12px;
+  transition:
+    transform 0.15s ease-out,
+    background 0.15s ease-out;
+}
+.slot:hover {
+  transform: translateY(-2px);
+}
+.slot.on {
+  background: #e3efd9;
+  border-color: var(--leaf);
+  box-shadow: 0 0 0 2px var(--leaf);
+}
+.slot .k {
+  color: var(--muted-ink);
+  font-weight: 600;
+}
+.slot .c {
+  font-weight: 700;
+}
+#help {
+  background: rgba(63, 50, 38, 0.55);
+  padding: 3px 10px;
+  border-radius: 999px;
+  text-shadow: none;
+}
+@media (pointer: coarse) {
+  #stick {
+    background: rgba(255, 248, 232, 0.3);
+    border: 1px solid rgba(255, 248, 232, 0.8);
+  }
+  #knob {
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+  #act {
+    border: 0;
+    background: var(--leaf);
+    color: #fff;
+    font: 700 16px var(--font);
+    box-shadow: var(--raised);
+  }
+}
+#emotes button {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  width: 44px;
+  height: 44px;
+}
+
+/* Dialogs: centred card on desktop, bottom sheet on phones */
+.modal {
+  background: rgba(42, 31, 20, 0.42);
+}
+.sheet {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: var(--raised);
+  width: min(560px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 20px;
+  animation: sheet-in 0.2s ease-out;
+}
+.sheet h2,
+.lobby h2 {
+  font: 600 22px var(--display);
+  color: var(--leaf-dark);
+}
+.brand {
+  font-family: var(--display);
+  font-weight: 700;
+  color: var(--leaf-dark);
+}
+@media (max-width: 600px) {
+  .modal:not(.lobby) {
+    place-items: end stretch;
+    padding: 0;
+  }
+  .modal:not(.lobby) .sheet {
+    width: 100%;
+    border-radius: 18px 18px 0 0;
+    max-height: 82vh;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    animation-name: sheet-up;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+@keyframes sheet-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+}
+.shop-row {
+  min-height: 56px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #fffdf6;
+  border: 1px solid var(--paper-strong);
+}
+.shop-row .nm {
+  font-weight: 600;
+}
+.shop-row small {
+  color: var(--muted-ink);
+  font-weight: 400;
+}
+.shop-row button,
+#kitchen-list button,
+.role footer button,
+.big {
+  border: 0;
+  background: var(--leaf);
+  color: #fff;
+  border-radius: 10px;
+  box-shadow: none;
+  font-family: var(--font);
+  font-weight: 600;
+  min-height: 40px;
+  transition: background 0.15s ease-out;
+}
+.shop-row button:hover:not(:disabled),
+.big:hover:not(:disabled) {
+  background: var(--leaf-dark);
+}
+.shop-row button:disabled,
+#kitchen-list button:disabled,
+.role footer button:disabled {
+  background: var(--paper-strong);
+  color: var(--muted-ink);
+  opacity: 1;
+}
+.sheet .close,
+#shop-close,
+#orders-close {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: 600 14px var(--font);
+  min-height: 40px;
+  padding: 6px 16px;
+  color: var(--ink);
+}
+.lobby input,
+#tree-form input,
+#mail-text {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffdf6;
+  font: 400 15px var(--font);
+}
+.room {
+  border: 1px solid var(--line);
+  background: #fffdf6;
+  transition:
+    border-color 0.15s ease-out,
+    transform 0.15s ease-out;
+}
+.room:hover {
+  transform: translateY(-1px);
+}
+.room b {
+  font-family: var(--display);
+  font-weight: 600;
+  color: var(--leaf-dark);
+}
+.lobby {
+  background: radial-gradient(circle at 30% 20%, #fdf3da, #e9d7ae);
+}
+#loading,
+.fatal {
+  background: radial-gradient(circle at 50% 40%, #fff8e8, #ead9b3);
+}
+#loading-bar {
+  background: var(--paper-strong);
+}
+#loading-bar i {
+  background: var(--leaf);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The hidden attribute always wins over component display rules. */
+#ui [hidden] {
+  display: none !important;
 }

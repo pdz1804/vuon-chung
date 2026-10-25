@@ -76,6 +76,13 @@ export class Hud {
     }).observe(document.querySelector('#ui')!, { subtree: true, attributeFilter: ['hidden'] });
     $('#shop-close').addEventListener('click', () => this.closeShop());
     $('#orders-close').addEventListener('click', () => ($('#orders').hidden = true));
+    // Escape closes the open dialog through its own close button, so each dialog's
+    // close logic still runs. The lobby has no close button and stays open.
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const open = document.querySelector<HTMLElement>('#ui .modal:not([hidden]):not(.lobby)');
+      open?.querySelector<HTMLButtonElement>('[id$="-close"]')?.click();
+    });
     this.bindStick();
     for (const b of document.querySelectorAll<HTMLButtonElement>('#emotes button')) {
       b.addEventListener('click', () => this.h.onEmote(b.dataset.e!));
