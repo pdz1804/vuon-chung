@@ -18,7 +18,7 @@ import { Panels } from '../ui/panels';
 import { Tutorial } from '../ui/tutorial';
 import { FishingPanel } from '../ui/fishing-panel';
 import { castsLeft, landCatch } from '../sim/fishing';
-import { disablePush, enablePush, pushStatus, touchDevice } from '../net/push';
+import { disablePush, enablePush, pushStatus, refreshDevice, touchDevice, usePushAccount } from '../net/push';
 import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../audio/sound';
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
 import { ZONES, gateAt, isFieldTile, isPondTile, propAt, setOpenZones } from './world-map';
@@ -168,6 +168,7 @@ export class GameController {
   /** Notification bell: only in a shared garden on the deployed site, never asked unprompted. */
   private bindBell() {
     const b = document.querySelector<HTMLButtonElement>('#bell')!;
+    usePushAccount(this.store.uid);
     if (!this.store.worldId || !import.meta.env.PROD || pushStatus() === 'unsupported') return;
     const label = () => {
       const st = pushStatus();
@@ -176,7 +177,11 @@ export class GameController {
     };
     b.hidden = false;
     label();
-    touchDevice(this.store.uid);
+    refreshDevice(this.store.uid);
+    // While the game is open and visible, keep telling the notifier not to send reminders.
+    setInterval(() => {
+      if (!document.hidden) touchDevice(this.store.uid);
+    }, 3 * 60_000);
     b.addEventListener('click', () => {
       const st = pushStatus();
       if (st === 'blocked' || st === 'install_first') return this.hud.toast(t(`bell.${st}`));

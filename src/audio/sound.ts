@@ -182,6 +182,7 @@ document.addEventListener('visibilitychange', () => {
     void ctx.suspend();
   } else {
     void ctx.resume();
+    stopMusic();
     scheduleMusic();
   }
 });

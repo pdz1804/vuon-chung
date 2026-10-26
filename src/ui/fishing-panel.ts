@@ -17,6 +17,8 @@ export class FishingPanel {
   private phase: Phase = 'idle';
   private timer = 0;
   private left = 0;
+  /** Bumped on every open/close so a late save result from an old session is ignored. */
+  private session = 0;
   private onCatch: () => Promise<boolean> = () => Promise.resolve(false);
 
   constructor() {
@@ -26,6 +28,7 @@ export class FishingPanel {
 
   /** Opens the card. `onCatch` saves one catch and resolves true when it was recorded. */
   open(castsLeft: number, onCatch: () => Promise<boolean>) {
+    this.session++;
     this.left = castsLeft;
     this.onCatch = onCatch;
     this.root.querySelector('h2')!.textContent = t('fish_title');
@@ -36,6 +39,7 @@ export class FishingPanel {
   }
 
   close() {
+    this.session++;
     clearTimeout(this.timer);
     this.phase = 'idle';
     this.root.hidden = true;
@@ -77,8 +81,10 @@ export class FishingPanel {
     clearTimeout(this.timer);
     this.phase = 'saving';
     this.btn.disabled = true;
+    const session = this.session;
     const ok = await this.onCatch().catch(() => false);
+    if (session !== this.session) return;
     if (ok) this.left -= 1;
-    if (!this.root.hidden) this.idle(t(ok ? 'fish_again' : 'fish_missed'));
+    this.idle(t(ok ? 'fish_again' : 'fish_missed'));
   }
 }

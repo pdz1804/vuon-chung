@@ -7,8 +7,11 @@ import { plotState, type FarmState } from './farm';
 export type Lang = 'vi' | 'en';
 /** Partner actions that notify the other player. Watering is too frequent to notify. */
 export const NOTIFY_MSGS = ['letter_sent', 'harvested', 'memory_added'] as const;
-/** At most this many partner-action notifications per person per Vietnam day. */
-export const DAILY_ACTION_LIMIT = 6;
+/**
+ * Daily caps per person, per kind: a harvest run must never use up the budget a
+ * letter or memory needs, so harvests have their own small cap.
+ */
+export const DAILY_LIMIT: Record<string, number> = { harvested: 2, letter_sent: 6, memory_added: 6, reminder: 1 };
 const VN_OFFSET_MS = 7 * 3_600_000;
 
 const COPY: Record<Lang, Record<string, string>> = {
@@ -41,9 +44,10 @@ export function newNotifyEvents(before: FeedEvent[], after: FeedEvent[]): FeedEv
 
 /** Notification text. Letter contents never appear in a notification. */
 export function notificationText(kind: string, lang: Lang, partnerName = ''): { title: string; body: string } {
-  const body = (COPY[lang][kind] ?? COPY[lang].ready).replace(
+  const copy = COPY[lang === 'en' ? 'en' : 'vi'];
+  const body = (copy[kind] ?? copy.ready).replace(
     '{name}',
-    partnerName || (lang === 'vi' ? 'Người ấy' : 'Your partner'),
+    partnerName || (lang === 'en' ? 'Your partner' : 'Người ấy'),
   );
   return { title: 'Vườn Chung', body };
 }

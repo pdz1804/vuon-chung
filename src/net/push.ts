@@ -34,12 +34,31 @@ export function pushStatus(): PushStatus {
     return isIosBrowserTab() ? 'install_first' : 'unsupported';
   }
   if (Notification.permission === 'denied') return 'blocked';
-  if (Notification.permission === 'granted' && localStorage.getItem(`${DEVICE_KEY}:on`) === '1') return 'on';
+  if (Notification.permission === 'granted' && onFlag() === '1') return 'on';
   return 'off';
+}
+
+/** The bell's "on" flag is per account, so a shared browser never mixes two people. */
+let currentUid = '';
+function onFlag(): string | null {
+  try {
+    return localStorage.getItem(`${DEVICE_KEY}:on:${currentUid}`);
+  } catch {
+    return null;
+  }
+}
+function setOnFlag(on: boolean) {
+  try {
+    if (on) localStorage.setItem(`${DEVICE_KEY}:on:${currentUid}`, '1');
+    else localStorage.removeItem(`${DEVICE_KEY}:on:${currentUid}`);
+  } catch {
+    // Private mode: the bell just shows off next time.
+  }
 }
 
 /** Asks for permission (must run from a tap) and registers this device's token. */
 export async function enablePush(uid: string): Promise<PushStatus> {
+  currentUid = uid;
   if (pushStatus() === 'unsupported' || pushStatus() === 'install_first') return pushStatus();
   if ((await Notification.requestPermission()) !== 'granted') return pushStatus();
   const { getMessaging, getToken, isSupported } = await import('firebase/messaging');
@@ -54,20 +73,37 @@ export async function enablePush(uid: string): Promise<PushStatus> {
     platform: 'web',
     lastSeenAt: Date.now(),
   });
-  localStorage.setItem(`${DEVICE_KEY}:on`, '1');
+  setOnFlag(true);
   return 'on';
 }
 
 export async function disablePush(uid: string): Promise<PushStatus> {
-  localStorage.removeItem(`${DEVICE_KEY}:on`);
+  currentUid = uid;
+  setOnFlag(false);
   await updateDoc(doc(db, 'users', uid, 'devices', deviceId()), { enabled: false }).catch(() => {});
   return pushStatus();
 }
 
+/** Which account the bell belongs to; call once the player is signed in. */
+export function usePushAccount(uid: string) {
+  currentUid = uid;
+}
+
 /** Tells the notifier this device is in the game now (no reminder needed) and its language. */
 export function touchDevice(uid: string) {
+  currentUid = uid;
   if (pushStatus() !== 'on') return;
   void updateDoc(doc(db, 'users', uid, 'devices', deviceId()), { lastSeenAt: Date.now(), lang: getLang() }).catch(
     () => {},
   );
+}
+
+/**
+ * At game start with the bell on: fetch the current token and store it enabled again,
+ * in case it rotated or the notifier switched this device off. Permission is already
+ * granted, so no prompt appears.
+ */
+export function refreshDevice(uid: string) {
+  currentUid = uid;
+  if (pushStatus() === 'on') void enablePush(uid).catch(() => setOnFlag(false));
 }

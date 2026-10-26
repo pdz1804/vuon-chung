@@ -50,7 +50,8 @@ export class Tutorial {
     this.el.querySelector('button')!.addEventListener('click', () => this.finish());
     const moved = () => this.notify('moved');
     window.addEventListener('keydown', (e) => {
-      if (/^(Arrow|Key[WASD]$)/.test(e.code)) moved();
+      const typing = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (!typing && /^(Arrow|Key[WASD]$)/.test(e.code)) moved();
     });
     document.querySelector('#stick')?.addEventListener('pointerdown', moved);
     this.render();

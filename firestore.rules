@@ -26,7 +26,10 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['token', 'enabled', 'lang', 'platform', 'lastSeenAt'])
           && request.resource.data.token is string
           && request.resource.data.token.size() <= 4096
-          && request.resource.data.enabled is bool;
+          && request.resource.data.enabled is bool
+          && request.resource.data.get('lang', 'vi') in ['vi', 'en']
+          && request.resource.data.get('platform', 'web') == 'web'
+          && request.resource.data.get('lastSeenAt', 0) is number;
       }
     }
 

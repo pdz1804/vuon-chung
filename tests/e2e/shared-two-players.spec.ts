@@ -77,7 +77,7 @@ test('two partners share one garden and see each other', async ({ browser }) => 
   await expect(b.locator('#toast')).toContainText(/thư|letter/i);
   await standFacing(b, 7, 4);
   await b.keyboard.press('Space');
-  await expect(b.locator('#mail-list .letter').first()).toContainText('Chào anh');
+  await expect(b.locator('#mail-list .letter:not(.story)').first()).toContainText('Chào anh');
   await b.locator('#mail-close').click();
 
   // A memory added by Bob shows on Alice's Memory Tree.

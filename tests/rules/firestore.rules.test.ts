@@ -134,6 +134,9 @@ describe('push devices', () => {
 
   it('rejects unexpected fields and keeps the notifier log server-only', async () => {
     await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'devices', 'd1'), { ...device, admin: true }));
+    // A bad language or timestamp could break the notifier for everyone: refused.
+    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'devices', 'd1'), { ...device, lang: 5 }));
+    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'devices', 'd1'), { ...device, lastSeenAt: 'now' }));
     await assertFails(getDoc(doc(as('bob'), 'push', 'day_bob_2026-10-25')));
   });
 });

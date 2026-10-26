@@ -288,6 +288,7 @@ export class Hud {
     const small = document.createElement('small');
     small.textContent = `${status} · +${o.coins} ${t('coins')} · +${o.xp} XP`;
     nm.append(small);
+    row.title = t('festival_note');
     drawIcon(row.querySelector('canvas')!, o.species);
     const b = document.createElement('button');
     const done = by.length >= 2;

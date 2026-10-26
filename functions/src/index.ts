@@ -13,7 +13,7 @@ import { logger } from 'firebase-functions';
 import type { FeedEvent } from '../../src/sim/couple';
 import { vnDay, type FarmState } from '../../src/sim/farm';
 import {
-  DAILY_ACTION_LIMIT,
+  DAILY_LIMIT,
   eventKey,
   isQuietHour,
   newNotifyEvents,
@@ -66,7 +66,7 @@ async function devicesOf(uid: string) {
  * Reserves one send for `uid` today: false when this exact notification was already
  * sent (`logId`) or the person's daily budget for this kind is used up.
  */
-async function reserve(uid: string, logId: string, kind: 'action' | 'reminder', now: number): Promise<boolean> {
+async function reserve(uid: string, logId: string, kind: string, now: number): Promise<boolean> {
   const day = vnDay(now);
   const logRef = database().doc(`push/log_${logId}`);
   const dayRef = database().doc(`push/day_${uid}_${day}`);
@@ -74,13 +74,32 @@ async function reserve(uid: string, logId: string, kind: 'action' | 'reminder', 
     const [log, counts] = await Promise.all([tx.get(logRef), tx.get(dayRef)]);
     if (log.exists) return false;
     const used = (counts.data()?.[kind] as number | undefined) ?? 0;
-    if (used >= (kind === 'action' ? DAILY_ACTION_LIMIT : 1)) return false;
+    if (used >= (DAILY_LIMIT[kind] ?? 1)) return false;
     // Logs and counters expire through a Firestore TTL policy on `expiresAt`.
     const expiresAt = new Date(now + 35 * 24 * 3_600_000);
     tx.set(logRef, { uid, kind, at: now, expiresAt });
     tx.set(dayRef, { [kind]: FieldValue.increment(1), expiresAt }, { merge: true });
     return true;
   });
+}
+
+/** Undoes a reservation when sending could not even start, so a retry sends it. */
+async function release(uid: string, logId: string, kind: string, now: number) {
+  await database().doc(`push/log_${logId}`).delete();
+  await database()
+    .doc(`push/day_${uid}_${vnDay(now)}`)
+    .set({ [kind]: FieldValue.increment(-1) }, { merge: true });
+}
+
+/** Reserves, then sends; a failure before any device was tried releases the slot. */
+async function deliver(uid: string, logId: string, kind: string, worldId: string, now: number, partnerName = '') {
+  if (!(await reserve(uid, logId, kind, now))) return;
+  try {
+    await send(uid, kind, worldId, partnerName);
+  } catch (e) {
+    await release(uid, logId, kind, now);
+    throw e;
+  }
 }
 
 /** Sends to every enabled device and switches off tokens FCM no longer accepts. */
@@ -98,7 +117,7 @@ async function send(uid: string, kind: string, worldId: string, partnerName = ''
         });
       } catch (e) {
         const code = (e as { code?: string }).code ?? '';
-        if (code.includes('registration-token-not-registered') || code.includes('invalid-argument')) {
+        if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) {
           await d.ref.update({ enabled: false });
         } else {
           logger.warn('push failed', { uid, code });
@@ -113,7 +132,7 @@ export const notifyPartner = onDocumentUpdated(
   async (event) => {
     const before = event.data?.before.data() as World | undefined;
     const after = event.data?.after.data() as World | undefined;
-    if (!before || !after) return;
+    if (!before?.farm || !after || after.test) return;
     const fresh = newNotifyEvents(before.farm?.feed ?? [], after.farm?.feed ?? []);
     if (!fresh.length) return;
     const now = Date.now();
@@ -122,9 +141,7 @@ export const notifyPartner = onDocumentUpdated(
     for (const e of fresh as FeedEvent[]) {
       const actorName = after.profiles?.[e.uid]?.name ?? '';
       for (const uid of after.members.filter((m) => m !== e.uid)) {
-        if (await reserve(uid, `${worldId}_${eventKey(e)}_${uid}`, 'action', now)) {
-          await send(uid, e.msg, worldId, actorName);
-        }
+        await deliver(uid, `${worldId}_${eventKey(e)}_${uid}`, e.msg, worldId, now, actorName);
       }
     }
   },
@@ -140,14 +157,17 @@ export const farmReminders = onSchedule(
     for (const doc of worlds.docs) {
       const w = doc.data() as World;
       if (w.test || w.members.length < 2 || !w.farm) continue;
-      const kind = reminderFor(w.farm, now);
-      if (!kind) continue;
-      for (const uid of w.members) {
-        const recent = (await devicesOf(uid)).some((d) => now - (d.lastSeenAt ?? 0) < ACTIVE_MS);
-        if (recent) continue;
-        if (await reserve(uid, `${doc.id}_${uid}_${day}_reminder`, 'reminder', now)) {
-          await send(uid, kind, doc.id);
+      try {
+        const kind = reminderFor(w.farm, now);
+        if (!kind) continue;
+        for (const uid of w.members) {
+          const recent = (await devicesOf(uid)).some((d) => now - (d.lastSeenAt ?? 0) < ACTIVE_MS);
+          if (recent) continue;
+          // One reminder a day: the 14:00 and 19:00 runs only send if the morning one had nothing to say.
+          await deliver(uid, `${doc.id}_${uid}_${day}_reminder`, 'reminder', doc.id, now);
         }
+      } catch (e) {
+        logger.error('reminder failed for one garden', { world: doc.id, error: String(e) });
       }
     }
   },

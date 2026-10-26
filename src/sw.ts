@@ -4,7 +4,7 @@
 import { ExpirationPlugin } from 'workbox-expiration';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { CacheFirst } from 'workbox-strategies';
+import { StaleWhileRevalidate } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -13,7 +13,8 @@ cleanupOutdatedCaches();
 registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html')));
 registerRoute(
   ({ url }) => url.pathname.startsWith('/models/') && url.pathname.endsWith('.glb'),
-  new CacheFirst({
+  // Serve the cached model at once, refresh it in the background for next time.
+  new StaleWhileRevalidate({
     cacheName: 'models-v1',
     plugins: [new ExpirationPlugin({ maxEntries: 48, maxAgeSeconds: 180 * 24 * 3600 })],
   }),
