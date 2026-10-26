@@ -494,6 +494,35 @@ export class Farm3DView implements FarmView {
         const sign = await instance('nature/sign', 1.2);
         sign.position.set(cx, 0, cz);
         this.scene.add(sign);
+      } else if (p.id === 'co_ba' || p.id === 'ong_minh') {
+        // Villagers stand still, facing the path.
+        const npc = await instance(p.id === 'co_ba' ? 'chars/character-female-a' : 'chars/character-male-a', 1.05);
+        npc.position.set(cx, 0, cz);
+        npc.rotation.y = 0;
+        // Tint their own copies of the materials so villagers never look like a player.
+        const tint = new THREE.Color(p.id === 'co_ba' ? 0xf2b8c6 : 0xb9d4f0);
+        npc.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).map((m) => {
+            const c = (m as THREE.MeshStandardMaterial).clone();
+            c.color.multiply(tint);
+            return c;
+          });
+          mesh.material = Array.isArray(mesh.material) ? mats : mats[0];
+        });
+        this.scene.add(npc);
+        // A nón lá (conical hat) marks the villagers at a glance.
+        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.26, 20), std(0xe9d9a6, 0.9));
+        hat.position.set(cx, 1.12, cz);
+        hat.castShadow = true;
+        this.scene.add(hat);
+        const tag = document.createElement('div');
+        tag.className = 'name-tag npc';
+        tag.textContent = p.id === 'co_ba' ? 'Cô Ba' : 'Ông Minh';
+        const label = new CSS2DObject(tag);
+        label.position.set(cx, 1.5, cz);
+        this.scene.add(label);
       } else if (p.id === 'meadow') {
         // A ring of wildflowers around a little sign marks the gathering spot.
         const sign = await instance('nature/sign', 0.9);

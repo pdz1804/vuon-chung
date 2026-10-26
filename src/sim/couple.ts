@@ -100,11 +100,17 @@ export function readLetters(s: FarmState, uid: string): ActionResult {
       changed = true;
     }
   }
+  // Story letters from the village count as read for this player too.
+  if (s.story && (s.story.read[uid] ?? 0) < s.story.beat) {
+    s.story.read[uid] = s.story.beat;
+    changed = true;
+  }
   return changed ? { ok: true, msg: 'letters_read' } : { ok: false, msg: 'letters_read' };
 }
 
 export function unreadFor(s: FarmState, uid: string): number {
-  return s.letters.filter((l) => l.from !== uid && !l.read).length;
+  const story = Math.max(0, (s.story?.beat ?? 0) - (s.story?.read[uid] ?? 0));
+  return s.letters.filter((l) => l.from !== uid && !l.read).length + story;
 }
 
 export function addMemory(s: FarmState, uid: string, date: string, title: string, now: number): ActionResult {

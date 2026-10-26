@@ -5,7 +5,19 @@ export const MAP_H = 22;
 export type Ground = 'grass' | 'path' | 'water' | 'fence' | 'tree' | 'field';
 
 export interface Prop {
-  id: 'house' | 'bin' | 'stall' | 'sapling' | 'board' | 'mailbox' | 'coop' | 'feeder' | 'meadow' | 'river';
+  id:
+    | 'house'
+    | 'bin'
+    | 'stall'
+    | 'sapling'
+    | 'board'
+    | 'mailbox'
+    | 'coop'
+    | 'feeder'
+    | 'meadow'
+    | 'river'
+    | 'co_ba'
+    | 'ong_minh';
   x: number;
   y: number;
   w: number;
@@ -24,6 +36,9 @@ export const PROPS: Prop[] = [
   // Inside the gated zones: the meadow's gathering spot and the river garden's fishing spot.
   { id: 'meadow', x: 16, y: 19, w: 1, h: 1 },
   { id: 'river', x: 29, y: 10, w: 1, h: 1 },
+  // Villagers: Cô Ba by the seed stall, Ông Minh by the order board.
+  { id: 'co_ba', x: 23, y: 5, w: 1, h: 1 },
+  { id: 'ong_minh', x: 20, y: 5, w: 1, h: 1 },
 ];
 
 /** Gated areas inside the homestead, each opened by a Garden Heart unlock. */

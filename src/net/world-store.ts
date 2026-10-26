@@ -17,6 +17,7 @@ import { now as clockNow, setClockOffset } from '../clock';
 import { loadFarm, saveFarm } from '../save';
 import { isFromNewerApp, migrate, newFarm, type ActionResult, type FarmState } from '../sim/farm';
 import { FEED_WORTHY, logEvent } from '../sim/couple';
+import { afterAction } from '../sim/milestones';
 import { levelFor } from '../sim/progression';
 import { db } from './firebase';
 
@@ -70,6 +71,7 @@ export class LocalStore implements WorldStore {
     const r = action(this.farm, now, LOCAL_UID);
     if (r.ok) {
       if (FEED_WORTHY.has(r.msg)) logEvent(this.farm, { t: now, uid: LOCAL_UID, msg: r.msg, vars: r.vars });
+      afterAction(this.farm, r, LOCAL_UID, now);
       saveFarm(this.farm);
     }
     return Promise.resolve(r);
@@ -129,6 +131,7 @@ export class SharedStore implements WorldStore {
       const r = action(farm, now, this.uid);
       if (r.ok) {
         if (FEED_WORTHY.has(r.msg)) logEvent(farm, { t: now, uid: this.uid, msg: r.msg, vars: r.vars });
+        afterAction(farm, r, this.uid, now);
         tx.update(ref, { farm, updatedAt: serverTimestamp() });
       }
       return r;

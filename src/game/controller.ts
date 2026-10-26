@@ -23,6 +23,7 @@ import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
 import { ZONES, gateAt, isFieldTile, isPondTile, propAt, setOpenZones } from './world-map';
 import { gatherMeadow } from '../sim/meadow';
+import { bondLevel, npcLineIndex } from '../sim/milestones';
 import { deliverFestival, festivalAt } from '../sim/festival';
 
 /** Walking side by side with your partner is a little faster. */
@@ -72,6 +73,7 @@ export class GameController {
   private selected: SpeciesId = 'rau_muong';
   private busy = false;
   private level = 0;
+  private bond = 0;
   private readonly tutorial = new Tutorial();
   private readonly fishing = new FishingPanel();
   private unread = 0;
@@ -306,6 +308,9 @@ export class GameController {
       const level = Object.entries(UNLOCKS).find(([, f]) => f.includes(gate.id))?.[0];
       return this.hud.toast(t(`locked_${gate.id}`, { n: level ?? '' }));
     }
+    if (prop?.id === 'co_ba' || prop?.id === 'ong_minh') {
+      return this.hud.toast(`${t(`npc.${prop.id}`)}: ${t(`npc.${prop.id}.${npcLineIndex(prop.id, now(), 3)}`)}`);
+    }
     if (prop?.id === 'meadow') return this.run((s, ts) => gatherMeadow(s, ts), true);
     if (isPondTile(x, y)) {
       if (!isUnlocked('fishing', farm.xp)) return this.hud.toast(t('locked_fishing'));
@@ -376,6 +381,12 @@ export class GameController {
     this.syncRoles();
     this.hud.showEmotes(this.store.members.length >= 2);
     const unread = unreadFor(farm, this.store.uid);
+    const bond = bondLevel(farm.bond?.points ?? 0);
+    if (this.bond && bond > this.bond) {
+      playSfx('levelup');
+      this.hud.toast(t('bond_up', { n: bond }));
+    }
+    this.bond = bond;
     if (unread > this.unread) {
       this.hud.toast(t('new_letter'));
       playSfx('letter');

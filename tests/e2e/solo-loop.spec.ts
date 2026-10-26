@@ -298,3 +298,21 @@ test('the meadow gate stays shut until level 3, then the meadow gives seeds', as
   await page.keyboard.press('Space');
   await expect.poll(() => page.evaluate(() => (window as unknown as QaWindow).__qa.farm().seeds.sunflower)).toBe(2);
 });
+
+test('planting brings the first story letter, and villagers say their line', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
+  await standFacing(page, 10, 10);
+  await page.keyboard.press('Space'); // till
+  await page.keyboard.press('Space'); // plant
+  await expect.poll(() => page.evaluate(() => (window as unknown as QaWindow).__qa.farm().story?.beat)).toBe(1);
+  await standFacing(page, 7, 4); // mailbox
+  await page.keyboard.press('Space');
+  await expect(page.locator('#mail .letter.story')).toHaveCount(1);
+  await page.keyboard.press('Escape');
+  await standFacing(page, 20, 5); // Ông Minh
+  await page.keyboard.press('Space');
+  await expect(page.locator('#toast')).toContainText(/Ông Minh|Grandpa Minh/);
+});

@@ -1,6 +1,7 @@
 // DOM overlay: status bar, seed hotbar, bag, toasts, shop, and touch controls.
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
+import { bondLevel } from '../sim/milestones';
 import { FESTIVAL_ORDER, festivalAt, festivalDelivered } from '../sim/festival';
 import { binValue, seedPrice, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
 import { ANIMALS, ANIMAL_IDS, type AnimalSpecies } from '../sim/animals';
@@ -120,6 +121,9 @@ export class Hud {
     const lv = levelFor(s.xp);
     $('#xp').innerHTML = `♥ ${t('level', { n: lv })}<i style="--p:${Math.round(levelProgress(s.xp) * 100)}%"></i>`;
     $('#xp').title = `XP ${s.xp}`;
+    const bond = s.bond?.points ?? 0;
+    $('#bond').textContent = `💞 ${bondLevel(bond)}`;
+    $('#bond').title = t('bond_title', { n: bondLevel(bond), p: bond });
     $('#lang').textContent = getLang() === 'vi' ? 'EN' : 'VI';
     $('#act').textContent = t('action');
     $('#help').textContent = t('help');

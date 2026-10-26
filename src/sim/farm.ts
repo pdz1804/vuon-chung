@@ -4,6 +4,7 @@ import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type Cro
 import type { Animal } from './animals';
 import type { FishingState } from './fishing';
 import type { FestivalState } from './festival';
+import type { BondState, StoryState } from './milestones';
 import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
 import { activeRank, gainRoleXp, type PlayerState } from './roles';
@@ -60,6 +61,10 @@ export interface FarmState {
   meadowDay?: string;
   /** The current festival order's progress (only the running festival is kept). */
   festival?: FestivalState;
+  /** The couple's bond: points never decrease; rewards are paid once per level. */
+  bond?: BondState;
+  /** Story chapter 1 progress and who has read which letters. */
+  story?: StoryState;
 }
 
 export type ActionResult =

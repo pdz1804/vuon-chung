@@ -1,6 +1,7 @@
 // Couple-layer dialogs: mailbox, Memory Tree, and "while you were away".
 // Text from the partner is always inserted with textContent, never as HTML.
 import { t } from '../i18n';
+import { STORY_BEATS } from '../sim/milestones';
 import { LETTER_MAX, MEMORY_TITLE_MAX, awaySummary, type Letter } from '../sim/couple';
 import { now } from '../clock';
 import { vnDay, type FarmState } from '../sim/farm';
@@ -151,7 +152,16 @@ export class Panels {
     this.labels();
     const list = $('#mail-list');
     const letters: Letter[] = s.letters;
+    // Story letters from the villagers sit above the couple's letters, newest first.
+    const story = STORY_BEATS.slice(0, s.story?.beat ?? 0)
+      .map((b, i) => {
+        const card = el('article', `letter story${i >= (s.story?.read[uid] ?? 0) ? ' unread' : ''}`);
+        card.append(el('header', '', `${t(`npc.${b.npc}`)} · ${t('story_chapter')}`), el('p', '', t(`story.${i + 1}`)));
+        return card;
+      })
+      .reverse();
     list.replaceChildren(
+      ...story,
       ...(letters.length
         ? letters.map((l) => {
             const card = el(
@@ -161,7 +171,9 @@ export class Panels {
             card.append(el('header', '', `${names[l.from] ?? '♥'} · ${when(l.t)}`), el('p', '', l.text));
             return card;
           })
-        : [el('p', 'muted', t('mail_empty'))]),
+        : story.length
+          ? []
+          : [el('p', 'muted', t('mail_empty'))]),
     );
     $('#mail').hidden = false;
     this.h.readLetters();
