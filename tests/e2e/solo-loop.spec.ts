@@ -246,3 +246,38 @@ test('tutorial skips ahead when a later step is done first and resumes after a r
   await page.reload();
   await expect(page.locator('#coach small')).toHaveText('3/6');
 });
+
+test('fishing at the pond: cast, reel on the bite, and the catch pays out', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
+  await page.evaluate(() => {
+    (window as unknown as QaWindow).__qa.farm().xp = 100;
+    (window as unknown as QaWindow).__qa.refresh();
+  });
+  await standFacing(page, 26, 13); // pond's north shore
+  await page.keyboard.press('Space');
+  await expect(page.locator('#fish')).toBeVisible();
+  const coins = await page.evaluate(() => (window as unknown as QaWindow).__qa.farm().coins);
+  await page.locator('#fish-btn').click();
+  // Reel from inside the page the moment the bobber dips: a slow CI round trip could
+  // otherwise miss the 0.7 s window.
+  await page.evaluate(
+    () =>
+      new Promise<void>((done) => {
+        const bobber = document.querySelector('#fish-bobber')!;
+        new MutationObserver((_, obs) => {
+          if (!bobber.classList.contains('bite')) return;
+          obs.disconnect();
+          document.querySelector<HTMLButtonElement>('#fish-btn')!.click();
+          done();
+        }).observe(bobber, { attributes: true });
+      }),
+  );
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as QaWindow).__qa.farm().coins))
+    .toBeGreaterThan(coins);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#fish')).toBeHidden();
+});

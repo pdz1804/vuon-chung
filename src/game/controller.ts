@@ -16,10 +16,12 @@ import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, drawIcon } from '../ui/hud';
 import { Panels } from '../ui/panels';
 import { Tutorial } from '../ui/tutorial';
+import { FishingPanel } from '../ui/fishing-panel';
+import { castsLeft, landCatch } from '../sim/fishing';
 import { disablePush, enablePush, pushStatus, touchDevice } from '../net/push';
 import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../audio/sound';
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
-import { isFieldTile, propAt } from './world-map';
+import { isFieldTile, isPondTile, propAt } from './world-map';
 
 /** Walking side by side with your partner is a little faster. */
 const TOGETHER_BOOST = 1.25;
@@ -40,6 +42,8 @@ const SFX_FOR: Record<string, Sfx> = {
   animal_bought: 'animal',
   order_done: 'coin',
   duo_done: 'levelup',
+  fish_caught: 'harvest',
+  fish_caught_duo: 'levelup',
   cooked: 'harvest',
   letter_sent: 'letter',
 };
@@ -64,6 +68,7 @@ export class GameController {
   private busy = false;
   private level = 0;
   private readonly tutorial = new Tutorial();
+  private readonly fishing = new FishingPanel();
   private unread = 0;
   private ranks = new Map<string, number>();
   private lastPayoutTry = 0;
@@ -287,6 +292,13 @@ export class GameController {
     if (prop?.id === 'board') {
       if (!isUnlocked('orders', farm.xp)) return this.hud.toast(t('locked_orders'));
       return this.hud.openOrders(farm, now(), this.duoContext());
+    }
+    if (isPondTile(x, y)) {
+      if (!isUnlocked('fishing', farm.xp)) return this.hud.toast(t('locked_fishing'));
+      return this.fishing.open(castsLeft(farm, this.store.uid, now()), async () => {
+        const r = await this.run((s, ts, uid) => landCatch(s, uid, ts));
+        return !!r?.ok;
+      });
     }
     if (!isFieldTile(x, y)) return this.hud.toast(t('cant_farm'));
     const selected = this.selected;

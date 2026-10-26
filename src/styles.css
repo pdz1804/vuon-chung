@@ -1259,3 +1259,48 @@ body:has(#lobby:not([hidden])) #status {
     bottom: calc(250px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Fishing card: a little pond with a bobber that dips on a bite. */
+#fish-pond {
+  position: relative;
+  height: 96px;
+  border-radius: 999px / 60px;
+  background: radial-gradient(ellipse at 50% 40%, #8fd0ec, #4fb1e0 70%, #3a8fbd);
+  overflow: hidden;
+}
+#fish-bobber {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  width: 16px;
+  height: 20px;
+  margin-left: -8px;
+  border-radius: 50% 50% 45% 45%;
+  background: linear-gradient(#e0533d 50%, #fff 50%);
+  opacity: 0;
+  transition: opacity 0.2s ease-out;
+}
+#fish-bobber.cast {
+  opacity: 1;
+  animation: bob 1.4s ease-in-out infinite;
+}
+#fish-bobber.bite {
+  opacity: 1;
+  animation: dip 0.18s ease-in-out infinite alternate;
+}
+#fish-status {
+  margin: 0;
+  text-align: center;
+  font-weight: 600;
+  min-height: 1.4em;
+}
+@keyframes bob {
+  50% {
+    transform: translateY(3px);
+  }
+}
+@keyframes dip {
+  to {
+    transform: translateY(12px) scale(0.9);
+  }
+}

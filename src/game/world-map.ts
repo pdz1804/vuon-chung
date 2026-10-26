@@ -55,6 +55,9 @@ export function buildGround(): Ground[][] {
   return g;
 }
 
+/** The pond: facing it opens the fishing card. */
+export const isPondTile = (x: number, y: number) => GROUND[y]?.[x] === 'water';
+
 export const isFieldTile = (x: number, y: number) => x >= FIELD.x0 && x <= FIELD.x1 && y >= FIELD.y0 && y <= FIELD.y1;
 
 export function propAt(x: number, y: number): Prop | undefined {

@@ -2,6 +2,7 @@
 // so the same code can later run against the shared Firestore world.
 import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type CropTimes } from './growth';
 import type { Animal } from './animals';
+import type { FishingState } from './fishing';
 import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
 import { activeRank, gainRoleXp, type PlayerState } from './roles';
@@ -52,6 +53,8 @@ export interface FarmState {
   players: Record<string, PlayerState>;
   /** Set once the garden's fast first crop has been planted. */
   firstCropUsed?: boolean;
+  /** Today's catches at the pond. */
+  fishing?: FishingState;
 }
 
 export type ActionResult =
