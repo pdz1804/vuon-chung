@@ -281,3 +281,20 @@ test('fishing at the pond: cast, reel on the bite, and the catch pays out', asyn
   await page.keyboard.press('Escape');
   await expect(page.locator('#fish')).toBeHidden();
 });
+
+test('the meadow gate stays shut until level 3, then the meadow gives seeds', async ({ page }) => {
+  await page.goto(URL);
+  await page.evaluate(() => localStorage.clear());
+  await page.goto(URL);
+  await page.waitForFunction(() => (window as unknown as QaWindow).__qa);
+  await standFacing(page, 23, 19); // the meadow gate
+  await page.keyboard.press('Space');
+  await expect(page.locator('#toast')).toContainText(/3/);
+  await page.evaluate(() => {
+    (window as unknown as QaWindow).__qa.farm().xp = 300;
+    (window as unknown as QaWindow).__qa.refresh();
+  });
+  await standFacing(page, 16, 19); // the gathering spot
+  await page.keyboard.press('Space');
+  await expect.poll(() => page.evaluate(() => (window as unknown as QaWindow).__qa.farm().seeds.sunflower)).toBe(2);
+});

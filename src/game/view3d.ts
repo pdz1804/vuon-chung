@@ -11,7 +11,8 @@ import { cropStage, cropWilted, plotState, type FarmState } from '../sim/farm';
 import type { SpeciesId } from '../sim/species';
 import { instance, instancedField, preload } from './models';
 import { DIRS, PX_PER_TILE, type Facing, type FarmView } from './view';
-import { FIELD, MAP_H, MAP_W, PEN, PROPS, SPAWN, buildGround, isBlocked, type Ground } from './world-map';
+import { MAP_H, MAP_W, PEN, PROPS, SPAWN, ZONES, buildGround, isBlocked, type Ground } from './world-map';
+import { isUnlocked } from '../sim/progression';
 
 const SPEED = 4.4; // tiles per second
 const RADIUS = 0.28; // farmer collision radius, tiles
@@ -169,6 +170,7 @@ export class Farm3DView implements FarmView {
   private animals = new Map<string, Actor & { species: keyof typeof ANIMAL_MODEL }>();
   private animalPos = new Map<string, { x: number; y: number }>();
   private tree?: THREE.Object3D;
+  private readonly gates = new Map<string, THREE.Object3D>();
   private treeStageShown = -1;
   private grain!: THREE.Mesh;
   private mailHeart!: CSS2DObject;
@@ -344,9 +346,15 @@ export class Farm3DView implements FarmView {
       'nature/tree_fat': [],
     };
     const kinds = Object.keys(forest);
+    // The south border faces the camera: a low hedge there keeps the meadow in view.
+    const hedge: Array<{ x: number; z: number; rot: number; scale: number }> = [];
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         if (ground[y][x] !== 'tree') continue;
+        if (y === MAP_H - 1 && x > 0 && x < MAP_W - 1) {
+          hedge.push({ x: x + 0.5, z: y + 0.5, rot: hash(x, y, 5) * 6, scale: 0.9 + hash(x, y, 6) * 0.3 });
+          continue;
+        }
         const k = kinds[Math.floor(hash(x, y, 3) * kinds.length)];
         forest[k].push({
           x: x + 0.5 + (hash(x, y, 4) - 0.5) * 0.3,
@@ -357,17 +365,27 @@ export class Farm3DView implements FarmView {
       }
     }
     for (const [k, at] of Object.entries(forest)) this.scene.add(await instancedField(k, 2.4, at));
+    this.scene.add(await instancedField('nature/plant_bushLarge', 0.7, hedge));
 
     // Field fence: rails along the field border, a gap at the gate.
     const fences: Array<{ x: number; z: number; rot: number }> = [];
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         if (ground[y][x] !== 'fence') continue;
-        const horizontal = y === FIELD.y0 - 1 || y === FIELD.y1 + 1;
+        // A rail runs along its neighbours: horizontal when the fence continues sideways.
+        const horizontal = ground[y][x - 1] === 'fence' || ground[y][x + 1] === 'fence';
         fences.push({ x: x + 0.5, z: y + 0.5, rot: horizontal ? 0 : Math.PI / 2 });
       }
     }
     this.scene.add(await instancedField('nature/fence_simple', 0.45, fences));
+    // Zone gates: a fence piece that disappears once the zone unlocks.
+    for (const z of ZONES) {
+      const gate = await instance('nature/fence_simple', 0.45);
+      gate.position.set(z.gate[0] + 0.5, 0, z.gate[1] + 0.5);
+      gate.rotation.y = Math.PI / 2;
+      this.scene.add(gate);
+      this.gates.set(z.id, gate);
+    }
 
     // Decor: flowers, grass tufts, rocks and mushrooms on open grass.
     const decor: Record<string, Array<{ x: number; z: number; rot: number; scale: number }>> = {
@@ -460,6 +478,27 @@ export class Farm3DView implements FarmView {
         const sign = await instance('nature/sign', 1.2);
         sign.position.set(cx, 0, cz);
         this.scene.add(sign);
+      } else if (p.id === 'meadow') {
+        // A ring of wildflowers around a little sign marks the gathering spot.
+        const sign = await instance('nature/sign', 0.9);
+        sign.position.set(cx, 0, cz);
+        this.scene.add(sign);
+        const kinds = ['nature/flower_redA', 'nature/flower_yellowA', 'nature/flower_purpleA'];
+        for (let i = 0; i < 6; i++) {
+          const f = await instance(kinds[i % 3], 0.3, false);
+          const a = (i / 6) * Math.PI * 2;
+          f.position.set(cx + Math.cos(a) * 0.45, 0, cz + Math.sin(a) * 0.45);
+          this.scene.add(f);
+        }
+      } else if (p.id === 'river') {
+        // A small spring with lily pads: the river garden's fishing spot.
+        const pool = new THREE.Mesh(new THREE.CircleGeometry(0.48, 24), std(PALETTE.water, 0.2));
+        pool.rotation.x = -Math.PI / 2;
+        pool.position.set(cx, 0.03, cz);
+        this.scene.add(pool);
+        const lily = await instance('nature/lily_large', 0.18, false);
+        lily.position.set(cx + 0.15, 0.04, cz - 0.1);
+        this.scene.add(lily);
       } else if (p.id === 'sapling') {
         this.tree = new THREE.Group();
         this.tree.position.set(cx, 0, cz);
@@ -638,6 +677,7 @@ export class Farm3DView implements FarmView {
   // ---------- farm state ----------
 
   drawFarm(farm: FarmState, now: number, uid: string) {
+    for (const [id, gate] of this.gates) gate.visible = !isUnlocked(id, farm.xp);
     const seen = new Set<string>();
     for (const [k, plot] of Object.entries(farm.plots)) {
       seen.add(k);

@@ -55,6 +55,8 @@ export interface FarmState {
   firstCropUsed?: boolean;
   /** Today's catches at the pond. */
   fishing?: FishingState;
+  /** Vietnam day the meadow was last gathered. */
+  meadowDay?: string;
 }
 
 export type ActionResult =

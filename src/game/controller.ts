@@ -21,7 +21,8 @@ import { castsLeft, landCatch } from '../sim/fishing';
 import { disablePush, enablePush, pushStatus, touchDevice } from '../net/push';
 import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../audio/sound';
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
-import { isFieldTile, isPondTile, propAt } from './world-map';
+import { ZONES, gateAt, isFieldTile, isPondTile, propAt, setOpenZones } from './world-map';
+import { gatherMeadow } from '../sim/meadow';
 
 /** Walking side by side with your partner is a little faster. */
 const TOGETHER_BOOST = 1.25;
@@ -43,6 +44,7 @@ const SFX_FOR: Record<string, Sfx> = {
   order_done: 'coin',
   duo_done: 'levelup',
   fish_caught: 'harvest',
+  meadow_gathered: 'plant',
   fish_caught_duo: 'levelup',
   cooked: 'harvest',
   letter_sent: 'letter',
@@ -293,6 +295,12 @@ export class GameController {
       if (!isUnlocked('orders', farm.xp)) return this.hud.toast(t('locked_orders'));
       return this.hud.openOrders(farm, now(), this.duoContext());
     }
+    const gate = gateAt(x, y);
+    if (gate && !isUnlocked(gate.id, farm.xp)) {
+      const level = Object.entries(UNLOCKS).find(([, f]) => f.includes(gate.id))?.[0];
+      return this.hud.toast(t(`locked_${gate.id}`, { n: level ?? '' }));
+    }
+    if (prop?.id === 'meadow') return this.run((s, ts) => gatherMeadow(s, ts), true);
     if (isPondTile(x, y)) {
       if (!isUnlocked('fishing', farm.xp)) return this.hud.toast(t('locked_fishing'));
       return this.fishing.open(castsLeft(farm, this.store.uid, now()), async () => {
@@ -339,6 +347,8 @@ export class GameController {
   // ---------- refresh ----------
 
   private refresh() {
+    // Collision follows the unlocks: open gates let the farmer into new zones.
+    setOpenZones(ZONES.filter((z) => isUnlocked(z.id, this.store.farm.xp)).map((z) => z.id));
     const farm = this.store.farm;
     // Level-ups can come from either partner, so detect them on every refresh.
     const lv = levelFor(farm.xp);
