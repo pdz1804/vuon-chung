@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
 
       - uses: actions/setup-node@v4
         with:
@@ -79,6 +80,13 @@ jobs:
 
       - name: Deploy hosting
         run: npx firebase deploy --only hosting --project "$PROJECT" --non-interactive
+
+      # The notifier only redeploys when its code or the shared game rules changed.
+      - name: Deploy notification functions
+        run: |
+          if git diff --quiet HEAD~1 HEAD -- functions src/sim; then echo "functions unchanged"; exit 0; fi
+          npm ci --prefix functions
+          npx firebase deploy --only functions --project "$PROJECT" --non-interactive --force
 
       # An SPA rewrite returns 200 for any path, so check content, not status codes.
       - name: Smoke test

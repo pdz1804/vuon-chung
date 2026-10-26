@@ -23,3 +23,30 @@ registerRoute(
 self.addEventListener('message', (e) => {
   if ((e.data as { type?: string } | null)?.type === 'SKIP_WAITING') void self.skipWaiting();
 });
+
+// Push from the notifier function (data-only, so the text and click target are ours).
+self.addEventListener('push', (e) => {
+  const payload = (e.data?.json() ?? {}) as { data?: Record<string, string> };
+  const d = payload.data ?? {};
+  e.waitUntil(
+    self.registration.showNotification(d.title ?? 'Vườn Chung', {
+      body: d.body ?? '',
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: d.tag,
+      data: { url: d.url ?? '/' },
+    }),
+  );
+});
+
+// Tapping a notification focuses an open game window, or opens the garden.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const url = (e.notification.data as { url?: string } | null)?.url ?? '/';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      const open = wins.find((w) => new URL(w.url).origin === self.location.origin);
+      return open ? open.focus() : self.clients.openWindow(url);
+    }),
+  );
+});

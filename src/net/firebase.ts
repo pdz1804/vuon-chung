@@ -15,7 +15,7 @@ const config = {
 
 export const EMULATORS = new URLSearchParams(location.search).get('emu') === '1';
 
-const app = initializeApp(
+export const app = initializeApp(
   EMULATORS ? { ...config, databaseURL: `http://127.0.0.1:9000?ns=${config.projectId}` } : config,
 );
 

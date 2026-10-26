@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'test-results', 'playwright-report', 'node_modules', '.claude'] },
+  { ignores: ['dist', 'coverage', 'test-results', 'playwright-report', 'node_modules', '.claude', 'functions'] },
   js.configs.recommended,
   {
     files: ['src/**/*.ts'],

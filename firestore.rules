@@ -16,6 +16,23 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read, write: if signedIn() && uid() == userId;
+
+      // Push devices: only the owner, only the expected small fields. The notifier
+      // function reads them with admin rights; the partner never sees a token.
+      match /devices/{deviceId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId
+          && deviceId.size() <= 64
+          && request.resource.data.keys().hasOnly(['token', 'enabled', 'lang', 'platform', 'lastSeenAt'])
+          && request.resource.data.token is string
+          && request.resource.data.token.size() <= 4096
+          && request.resource.data.enabled is bool;
+      }
+    }
+
+    // Notifier bookkeeping (sent-log and daily counters): server only.
+    match /push/{id} {
+      allow read, write: if false;
     }
 
     match /worlds/{w} {

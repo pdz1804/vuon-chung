@@ -16,6 +16,7 @@ import { SPECIES_IDS, type SpeciesId } from '../sim/species';
 import { Hud, drawIcon } from '../ui/hud';
 import { Panels } from '../ui/panels';
 import { Tutorial } from '../ui/tutorial';
+import { disablePush, enablePush, pushStatus, touchDevice } from '../net/push';
 import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../audio/sound';
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
 import { isFieldTile, propAt } from './world-map';
@@ -150,7 +151,34 @@ export class GameController {
     b.title = b.ariaLabel = t(isMuted() ? 'sound_off' : 'sound_on');
   }
 
+  /** Notification bell: only in a shared garden on the deployed site, never asked unprompted. */
+  private bindBell() {
+    const b = document.querySelector<HTMLButtonElement>('#bell')!;
+    if (!this.store.worldId || !import.meta.env.PROD || pushStatus() === 'unsupported') return;
+    const label = () => {
+      const st = pushStatus();
+      b.textContent = st === 'on' ? '🔔' : '🔕';
+      b.title = b.ariaLabel = t(`bell.${st}`);
+    };
+    b.hidden = false;
+    label();
+    touchDevice(this.store.uid);
+    b.addEventListener('click', () => {
+      const st = pushStatus();
+      if (st === 'blocked' || st === 'install_first') return this.hud.toast(t(`bell.${st}`));
+      const next = st === 'on' ? disablePush(this.store.uid) : enablePush(this.store.uid);
+      void next
+        .then((s) => this.hud.toast(t(s === 'on' ? 'bell.enabled' : s === 'off' ? 'bell.disabled' : `bell.${s}`)))
+        .catch((e) => {
+          console.error(e);
+          this.hud.toast(t('sync_error'));
+        })
+        .finally(label);
+    });
+  }
+
   private bindUi() {
+    this.bindBell();
     this.labelMute();
     document.querySelector('#mute')!.addEventListener('click', () => {
       setMuted(!isMuted());
@@ -177,6 +205,7 @@ export class GameController {
         this.refresh();
         this.tutorial.render();
         this.labelMute();
+        touchDevice(this.store.uid);
       },
     });
   }

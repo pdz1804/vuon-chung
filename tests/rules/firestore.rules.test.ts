@@ -122,3 +122,18 @@ describe('users', () => {
     await assertFails(getDoc(doc(as('eve'), 'users', 'bob')));
   });
 });
+
+describe('push devices', () => {
+  const device = { token: 't'.repeat(150), enabled: true, lang: 'vi', platform: 'web', lastSeenAt: 1 };
+
+  it('lets only the owner store a device token', async () => {
+    await assertSucceeds(setDoc(doc(as('bob'), 'users', 'bob', 'devices', 'd1'), device));
+    await assertFails(setDoc(doc(as('eve'), 'users', 'bob', 'devices', 'd1'), device));
+    await assertFails(getDoc(doc(as('eve'), 'users', 'bob', 'devices', 'd1')));
+  });
+
+  it('rejects unexpected fields and keeps the notifier log server-only', async () => {
+    await assertFails(setDoc(doc(as('bob'), 'users', 'bob', 'devices', 'd1'), { ...device, admin: true }));
+    await assertFails(getDoc(doc(as('bob'), 'push', 'day_bob_2026-10-25')));
+  });
+});
