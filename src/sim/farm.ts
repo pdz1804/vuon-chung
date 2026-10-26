@@ -3,6 +3,7 @@
 import { WATER_MS, isHydrated, isWilted, progress, qualityStars, stage, type CropTimes } from './growth';
 import type { Animal } from './animals';
 import type { FishingState } from './fishing';
+import type { FestivalState } from './festival';
 import { bothHandsToday, hadBothHands, markCare, tend, type FeedEvent, type Letter, type Memory } from './couple';
 import { isUnlocked } from './progression';
 import { activeRank, gainRoleXp, type PlayerState } from './roles';
@@ -57,6 +58,8 @@ export interface FarmState {
   fishing?: FishingState;
   /** Vietnam day the meadow was last gathered. */
   meadowDay?: string;
+  /** The current festival order's progress (only the running festival is kept). */
+  festival?: FestivalState;
 }
 
 export type ActionResult =

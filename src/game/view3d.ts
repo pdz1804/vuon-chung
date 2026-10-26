@@ -13,6 +13,7 @@ import { instance, instancedField, preload } from './models';
 import { DIRS, PX_PER_TILE, type Facing, type FarmView } from './view';
 import { MAP_H, MAP_W, PEN, PROPS, SPAWN, ZONES, buildGround, isBlocked, type Ground } from './world-map';
 import { isUnlocked } from '../sim/progression';
+import { festivalAt } from '../sim/festival';
 
 const SPEED = 4.4; // tiles per second
 const RADIUS = 0.28; // farmer collision radius, tiles
@@ -171,6 +172,8 @@ export class Farm3DView implements FarmView {
   private animalPos = new Map<string, { x: number; y: number }>();
   private tree?: THREE.Object3D;
   private readonly gates = new Map<string, THREE.Object3D>();
+  /** Festival lanterns along the path, shown only while a festival runs. */
+  private readonly festive = new THREE.Group();
   private treeStageShown = -1;
   private grain!: THREE.Mesh;
   private mailHeart!: CSS2DObject;
@@ -444,6 +447,19 @@ export class Farm3DView implements FarmView {
   }
 
   private async buildProps() {
+    // Red festival lanterns on posts along the main path; hidden outside festivals.
+    for (let x = 4; x <= 27; x += 3) {
+      const post = await instance('town/lantern', 1.1);
+      post.position.set(x + 0.5, 0, 5.4);
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.16, 12, 10),
+        new THREE.MeshStandardMaterial({ color: 0xd9412b, emissive: 0xff5a3c, emissiveIntensity: 0.9 }),
+      );
+      glow.position.set(x + 0.5, 1.25, 5.4);
+      this.festive.add(post, glow);
+    }
+    this.festive.visible = false;
+    this.scene.add(this.festive);
     for (const p of PROPS) {
       const cx = p.x + p.w / 2;
       const cz = p.y + p.h / 2;
@@ -678,6 +694,7 @@ export class Farm3DView implements FarmView {
 
   drawFarm(farm: FarmState, now: number, uid: string) {
     for (const [id, gate] of this.gates) gate.visible = !isUnlocked(id, farm.xp);
+    this.festive.visible = festivalAt(now) !== null;
     const seen = new Set<string>();
     for (const [k, plot] of Object.entries(farm.plots)) {
       seen.add(k);

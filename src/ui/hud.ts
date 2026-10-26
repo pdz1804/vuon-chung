@@ -1,6 +1,7 @@
 // DOM overlay: status bar, seed hotbar, bag, toasts, shop, and touch controls.
 // DOM (not canvas) so text stays crisp and Vietnamese diacritics render properly.
 import { getLang, setLang, t } from '../i18n';
+import { FESTIVAL_ORDER, festivalAt, festivalDelivered } from '../sim/festival';
 import { binValue, seedPrice, speciesUnlocked, vnDay, type FarmState } from '../sim/farm';
 import { ANIMALS, ANIMAL_IDS, type AnimalSpecies } from '../sim/animals';
 import { boardFor, doneToday, duoDelivered, duoFor, haveCount } from '../sim/orders';
@@ -14,6 +15,7 @@ export interface HudHandlers {
   onBuy(id: SpeciesId, n: number): void;
   onDeliver(idx: number): void;
   onDeliverDuo(): void;
+  onDeliverFestival(): void;
   onBuyAnimal(species: AnimalSpecies): void;
   onEmote(e: string): void;
   onLangChange(): void;
@@ -32,6 +34,7 @@ export class Hud {
     onBuy: () => {},
     onDeliver: () => {},
     onDeliverDuo: () => {},
+    onDeliverFestival: () => {},
     onBuyAnimal: () => {},
     onEmote: () => {},
     onLangChange: () => {},
@@ -238,6 +241,7 @@ export class Hud {
       }),
     );
     if (duo) $('#orders-list').append(this.duoRow(s, now, duo.uid, duo.names));
+    if (duo && festivalAt(now)) $('#orders-list').append(this.festivalRow(s, now, duo.uid, duo.names));
     $('#orders').hidden = false;
   }
 
@@ -259,6 +263,33 @@ export class Hud {
     b.textContent = done ? '✓' : by.includes(uid) ? '⏳' : t('deliver');
     b.disabled = done || by.includes(uid) || have < o.count;
     b.addEventListener('click', () => this.h.onDeliverDuo());
+    row.append(b);
+    return row;
+  }
+
+  /** The festival order: like the duo order, but paid once per festival. */
+  private festivalRow(s: FarmState, now: number, uid: string, names: Record<string, string>) {
+    const f = festivalAt(now)!;
+    const o = FESTIVAL_ORDER[f.kind];
+    const by = festivalDelivered(s, now);
+    const row = document.createElement('div');
+    row.className = 'shop-row duo festival';
+    const status = Object.entries(names)
+      .map(([u, n]) => `${n} ${by.includes(u) ? '✓' : '…'}`)
+      .join(' · ');
+    const have = Math.min(haveCount(s, o.species), o.count);
+    row.innerHTML = `<canvas width="16" height="16"></canvas><span class="nm"></span>`;
+    const nm = row.querySelector('.nm')!;
+    nm.textContent = `${t(`festival.${f.kind}`)} · ${t(`sp.${o.species}`)} ×${o.count} ${t('each')}`;
+    const small = document.createElement('small');
+    small.textContent = `${status} · +${o.coins} ${t('coins')} · +${o.xp} XP`;
+    nm.append(small);
+    drawIcon(row.querySelector('canvas')!, o.species);
+    const b = document.createElement('button');
+    const done = by.length >= 2;
+    b.textContent = done ? '✓' : by.includes(uid) ? '⏳' : t('deliver');
+    b.disabled = done || by.includes(uid) || have < o.count;
+    b.addEventListener('click', () => this.h.onDeliverFestival());
     row.append(b);
     return row;
   }

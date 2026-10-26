@@ -23,6 +23,7 @@ import { isMuted, playSfx, setMuted, setNight, unlockAudio, type Sfx } from '../
 import { PX_PER_TILE, type Facing, type FarmView } from './view';
 import { ZONES, gateAt, isFieldTile, isPondTile, propAt, setOpenZones } from './world-map';
 import { gatherMeadow } from '../sim/meadow';
+import { deliverFestival, festivalAt } from '../sim/festival';
 
 /** Walking side by side with your partner is a little faster. */
 const TOGETHER_BOOST = 1.25;
@@ -45,6 +46,8 @@ const SFX_FOR: Record<string, Sfx> = {
   duo_done: 'levelup',
   fish_caught: 'harvest',
   meadow_gathered: 'plant',
+  festival_done: 'levelup',
+  festival_half: 'coin',
   fish_caught_duo: 'levelup',
   cooked: 'harvest',
   letter_sent: 'letter',
@@ -97,6 +100,8 @@ export class GameController {
     this.refresh();
     if (this.boot.isNew) this.hud.toast(t('welcome'));
     this.tutorial.start(this.store.farm.xp);
+    const festival = festivalAt(now());
+    if (festival) this.hud.toast(t(`festival.greeting.${festival.kind}`));
     // Browsers only allow sound after a gesture, so the first one switches audio on.
     const unlock = () => unlockAudio();
     window.addEventListener('pointerdown', unlock);
@@ -205,6 +210,7 @@ export class GameController {
       onBuy: (id, n) => void this.run((s, _, uid) => buySeeds(s, id, n, uid)),
       onDeliver: (i) => void this.run((s, ts) => fulfill(s, i, ts)),
       onDeliverDuo: () => void this.run((s, ts, uid) => deliverDuo(s, uid, ts)),
+      onDeliverFestival: () => void this.run((s, ts, uid) => deliverFestival(s, uid, ts)),
       onBuyAnimal: (species) =>
         void this.run((s, ts) => buyAnimal(s, species, CHICK_NAMES[s.animals.length % CHICK_NAMES.length], ts)),
       onEmote: (e) => this.emote(e),
